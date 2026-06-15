@@ -1,11 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { getEnvironmentVariables } from './config/get-environment-variables';
 import { validateEnvironment } from './config/validate-environment';
 import { buildTypeOrmOptions } from './database/typeorm.config';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -18,8 +17,7 @@ import { buildTypeOrmOptions } from './database/typeorm.config';
       useFactory: (configService: ConfigService) =>
         buildTypeOrmOptions(getEnvironmentVariables(configService)),
     }),
+    HealthModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
 })
 export class AppModule {}

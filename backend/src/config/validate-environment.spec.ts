@@ -6,6 +6,7 @@ describe('validateEnvironment', () => {
   const validConfig = {
     PORT: '3000',
     NODE_ENV: NodeEnvironment.Development,
+    FRONTEND_URL: 'http://localhost:5173',
     DB_HOST: 'localhost',
     DB_PORT: '5432',
     DB_USERNAME: 'moveo_user',

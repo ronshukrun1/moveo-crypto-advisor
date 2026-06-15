@@ -13,5 +13,6 @@ export function getEnvironmentVariables(
     DB_USERNAME: configService.getOrThrow<string>('DB_USERNAME'),
     DB_PASSWORD: configService.getOrThrow<string>('DB_PASSWORD'),
     DB_NAME: configService.getOrThrow<string>('DB_NAME'),
+    FRONTEND_URL: configService.getOrThrow<string>('FRONTEND_URL'),
   };
 }

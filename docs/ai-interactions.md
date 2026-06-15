@@ -109,3 +109,43 @@ Added Docker Compose PostgreSQL, validated environment configuration, shared Typ
 
 - If host port `5432` is in use, align `POSTGRES_PORT` and `DB_PORT` in local env files
 - `npm run test:e2e` not updated for database dependency
+
+---
+
+## Stage 3: Backend Foundation
+
+**Date:** 2026-06-15
+
+**Prompt summary:**
+
+Add shared NestJS backend foundation: global `/api` prefix, ValidationPipe, CORS from `FRONTEND_URL`, Swagger at `/api/docs`, health endpoint with DB check, global exception filter, and tests. No auth or business features.
+
+**Response summary:**
+
+Implemented shared app setup, health module, global validation/error handling, Swagger, and CORS. Removed default scaffold controller. Added unit and E2E tests for health, validation, and error formatting.
+
+**Main decisions:**
+
+- `configureApplication()` shared by runtime and E2E; Swagger initialized only in `main.ts`
+- ValidationPipe rejects unknown fields with 400; explicit `@Type()` for query transformation
+- CORS uses validated `FRONTEND_URL` only; no wildcard or credentials
+- Health check uses `SELECT 1`; 503 preserves safe `database.status` via exception filter
+- No global success-response wrapper
+
+**Files created or modified:**
+
+- Created: `backend/src/app.setup.ts`, `backend/src/common/filters/*`, `backend/src/health/*`, `backend/test/health.e2e-spec.ts`, `backend/test/validation.e2e-spec.ts`, `backend/test/setup-e2e-env.ts`
+- Modified: `backend/src/main.ts`, `backend/src/app.module.ts`, `backend/src/config/*`, `backend/.env.example`, `backend/package.json`, `backend/test/jest-e2e.json`, `docs/ai-interactions.md`
+- Removed: `backend/src/app.controller.ts`, `backend/src/app.service.ts`, `backend/src/app.controller.spec.ts`, `backend/test/app.e2e-spec.ts`
+
+**Commands and tests:**
+
+- `docker compose up -d` / `ps` — Pass (healthy)
+- `backend`: build, lint, test (12), test:e2e (4), audit — Pass
+- `root`: build, lint, test — Pass
+
+**Unresolved issues:**
+
+- E2E tests require running PostgreSQL via Docker Compose
+- If host port `5432` is occupied, align `POSTGRES_PORT` and `DB_PORT` in local env files
+
