@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { QueryFailedError, Repository } from 'typeorm';
+import { EntityManager, QueryFailedError, Repository } from 'typeorm';
 import { UsersService } from '../users/users.service';
 import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 import { UserPreference } from './entities/user-preference.entity';
@@ -55,6 +55,38 @@ export class PreferencesService {
       message: 'Preferences updated successfully',
       preferences: toPreferencesResponseDto(savedPreferences),
     };
+  }
+
+  async upsertForUserWithManager(
+    manager: EntityManager,
+    userId: number,
+    data: {
+      investorProfile: InvestorProfile;
+      showMarketPrices: boolean;
+      showNews: boolean;
+      showAiInsight: boolean;
+      showMeme: boolean;
+    },
+  ): Promise<UserPreference> {
+    const repository = manager.getRepository(UserPreference);
+    const existingPreferences = await repository.findOne({ where: { userId } });
+
+    if (existingPreferences) {
+      existingPreferences.investorProfile = data.investorProfile;
+      existingPreferences.showMarketPrices = data.showMarketPrices;
+      existingPreferences.showNews = data.showNews;
+      existingPreferences.showAiInsight = data.showAiInsight;
+      existingPreferences.showMeme = data.showMeme;
+
+      return repository.save(existingPreferences);
+    }
+
+    const preferences = repository.create({
+      userId,
+      ...data,
+    });
+
+    return repository.save(preferences);
   }
 
   private async getOrCreateForUser(userId: number): Promise<UserPreference> {

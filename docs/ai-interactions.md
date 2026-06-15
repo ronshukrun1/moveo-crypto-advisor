@@ -326,4 +326,68 @@ Added explicit `UserSelectedCoin` entity with composite primary key, atomic full
 - E2E requires Docker PostgreSQL with migrations applied
 - Local `DB_PORT` may need to match `POSTGRES_PORT` when host `5432` is occupied
 
+---
+
+## Stage 8: Onboarding Orchestration
+
+**Date:** 2026-06-15
+
+**Prompt summary:**
+
+Implement one authenticated `POST /api/onboarding` flow that atomically saves preferences, replaces selected coins, and sets `onboardingCompleted = true`, with validation, Swagger, and tests.
+
+**Response summary:**
+
+Added `OnboardingModule` that orchestrates existing preferences, selected-coins, and users logic inside a single TypeORM transaction, with transaction-aware helper methods on existing services.
+
+**Main decisions:**
+
+- No new migration — existing `users`, `user_preferences`, and `user_selected_coins` tables already support onboarding
+- Coin validation runs before the transaction; invalid/inactive IDs never write to the database
+- Transaction steps: verify user → upsert preferences → replace selected coins → set `onboardingCompleted = true`
+- Repeated onboarding allowed — replaces prior choices and keeps `onboardingCompleted = true`
+- Onboarding response preferences omit `id` and timestamps; selected coins reuse `CoinItemDto`
+
+**Files created or modified:**
+
+- Created: `backend/src/onboarding/*`, `backend/test/onboarding.e2e-spec.ts`
+- Modified: `backend/src/app.module.ts`, `backend/src/preferences/preferences.service.ts`, `backend/src/selected-coins/selected-coins.service.ts`, `backend/src/selected-coins/selected-coins.module.ts`, `backend/src/users/users.service.ts`, `docs/ai-interactions.md`
+
+**Migration required:**
+
+- No — all required schema already existed from Stages 4–7
+
+**Commands and tests:**
+
+- `docker compose up -d` / `ps` — Pass (healthy)
+- `migration:show` / `run` — Pass (no pending migrations)
+- `backend`: build, lint, test (47), test:e2e (45), audit — Fail (19 moderate transitive `js-yaml` advisories)
+- `root`: build, lint, test — Pass
+
+**Unresolved issues:**
+
+- E2E requires Docker PostgreSQL with migrations applied
+- Local `DB_PORT` may need to match `POSTGRES_PORT` when host `5432` is occupied
+
+---
+
+## Maintenance: `js-yaml` audit remediation
+
+**Date:** 2026-06-15
+
+**Advisory:** GHSA-h67p-54hq-rp68 (CVE-2026-53550) — quadratic-complexity DoS in YAML merge-key parsing; fixed in `js-yaml@4.2.0`, published 2026-06-15.
+
+**Dependency chains:** `@nestjs/swagger` (production, `js-yaml@4.1.1`) and Jest coverage tooling via `@istanbuljs/load-nyc-config` (development, `js-yaml@3.14.2`). Root and frontend audits were unaffected.
+
+**Exposure:** Limited in this project — Swagger uses `js-yaml` for `dump()` only (OpenAPI YAML export), not parsing untrusted YAML; Jest chain is dev-only.
+
+**Remediation:** Added `overrides: { "js-yaml": "4.2.0" }` to `backend/package.json`.
+
+**Verification:**
+
+- `npm ls js-yaml` — all instances `4.2.0`
+- `npm audit` — 0 vulnerabilities
+- `build`, `lint`, `test` (47), `test:e2e` (45) — Pass
+- `GET /api/docs` — 200 (Swagger UI)
+- `GET /api/docs-yaml` — 200 (OpenAPI YAML)
 

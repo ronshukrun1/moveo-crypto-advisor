@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Not, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Not, Repository } from 'typeorm';
 import { CoinItemDto } from '../coins/dto/coin-response.dto';
 import { Coin } from '../coins/entities/coin.entity';
 import { CoinsService } from '../coins/coins.service';
@@ -47,36 +47,7 @@ export class SelectedCoinsService {
     const validatedCoins = await this.validateActiveCoinIds(coinIds);
 
     await this.dataSource.transaction(async (manager) => {
-      const repository = manager.getRepository(UserSelectedCoin);
-
-      if (coinIds.length === 0) {
-        await repository.delete({ userId });
-        return;
-      }
-
-      await repository.delete({
-        userId,
-        coinId: Not(In(coinIds)),
-      });
-
-      const existingSelections = await repository.find({
-        where: { userId },
-        select: { coinId: true },
-      });
-      const existingCoinIds = new Set(
-        existingSelections.map((selection) => selection.coinId),
-      );
-      const coinIdsToInsert = coinIds.filter(
-        (coinId) => !existingCoinIds.has(coinId),
-      );
-
-      if (coinIdsToInsert.length > 0) {
-        await repository.save(
-          coinIdsToInsert.map((coinId) =>
-            repository.create({ userId, coinId }),
-          ),
-        );
-      }
+      await this.replaceWithManager(manager, userId, coinIds);
     });
 
     return {
@@ -85,7 +56,42 @@ export class SelectedCoinsService {
     };
   }
 
-  private async validateActiveCoinIds(coinIds: number[]): Promise<Coin[]> {
+  async replaceWithManager(
+    manager: EntityManager,
+    userId: number,
+    coinIds: number[],
+  ): Promise<void> {
+    const repository = manager.getRepository(UserSelectedCoin);
+
+    if (coinIds.length === 0) {
+      await repository.delete({ userId });
+      return;
+    }
+
+    await repository.delete({
+      userId,
+      coinId: Not(In(coinIds)),
+    });
+
+    const existingSelections = await repository.find({
+      where: { userId },
+      select: { coinId: true },
+    });
+    const existingCoinIds = new Set(
+      existingSelections.map((selection) => selection.coinId),
+    );
+    const coinIdsToInsert = coinIds.filter(
+      (coinId) => !existingCoinIds.has(coinId),
+    );
+
+    if (coinIdsToInsert.length > 0) {
+      await repository.save(
+        coinIdsToInsert.map((coinId) => repository.create({ userId, coinId })),
+      );
+    }
+  }
+
+  async validateActiveCoinIds(coinIds: number[]): Promise<Coin[]> {
     if (coinIds.length === 0) {
       return [];
     }

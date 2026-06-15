@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
-import { QueryFailedError, Repository } from 'typeorm';
+import { QueryFailedError, Repository, EntityManager } from 'typeorm';
 import { User } from './entities/user.entity';
 
 const BCRYPT_SALT_ROUNDS = 12;
@@ -63,6 +63,26 @@ export class UsersService {
     }
 
     return user;
+  }
+
+  async findByIdWithManager(manager: EntityManager, id: number): Promise<User> {
+    const user = await manager.getRepository(User).findOne({ where: { id } });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return user;
+  }
+
+  async setOnboardingCompletedWithManager(
+    manager: EntityManager,
+    userId: number,
+  ): Promise<User> {
+    const user = await this.findByIdWithManager(manager, userId);
+    user.onboardingCompleted = true;
+
+    return manager.getRepository(User).save(user);
   }
 
   async validatePassword(user: User, password: string): Promise<boolean> {

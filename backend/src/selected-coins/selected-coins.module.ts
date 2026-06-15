@@ -16,5 +16,6 @@ import { SelectedCoinsService } from './selected-coins.service';
   ],
   controllers: [SelectedCoinsController],
   providers: [SelectedCoinsService],
+  exports: [SelectedCoinsService],
 })
 export class SelectedCoinsModule {}
