@@ -7,6 +7,7 @@ import { buildTypeOrmOptions } from './database/typeorm.config';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { CoinsModule } from './coins/coins.module';
+import { MarketModule } from './market/market.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { PreferencesModule } from './preferences/preferences.module';
 import { SelectedCoinsModule } from './selected-coins/selected-coins.module';
@@ -30,6 +31,7 @@ import { UsersModule } from './users/users.module';
     PreferencesModule,
     SelectedCoinsModule,
     OnboardingModule,
+    MarketModule,
   ],
 })
 export class AppModule {}

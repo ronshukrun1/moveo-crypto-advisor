@@ -14,6 +14,9 @@ const defaultTestEnvironment = {
   DB_USERNAME: 'moveo_user',
   DB_PASSWORD: 'change_me',
   DB_NAME: 'moveo_crypto_advisor',
+  COINGECKO_BASE_URL: 'https://api.coingecko.com/api/v3',
+  COINGECKO_API_KEY: 'test-coingecko-api-key',
+  COINGECKO_TIMEOUT_MS: '5000',
 };
 
 for (const [key, value] of Object.entries(defaultTestEnvironment)) {

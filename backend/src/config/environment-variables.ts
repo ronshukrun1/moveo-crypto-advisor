@@ -57,4 +57,16 @@ export class EnvironmentVariables {
   @IsString()
   @IsNotEmpty()
   JWT_EXPIRES_IN: string;
+
+  @IsUrl({ require_tld: false })
+  COINGECKO_BASE_URL: string;
+
+  @IsString()
+  @IsNotEmpty()
+  COINGECKO_API_KEY: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  COINGECKO_TIMEOUT_MS: number;
 }

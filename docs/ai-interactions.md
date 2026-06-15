@@ -391,3 +391,57 @@ Added `OnboardingModule` that orchestrates existing preferences, selected-coins,
 - `GET /api/docs` — 200 (Swagger UI)
 - `GET /api/docs-yaml` — 200 (OpenAPI YAML)
 
+---
+
+## Stage 9: CoinGecko Market Data Integration
+
+**Date:** 2026-06-15
+
+**Prompt summary:**
+
+Integrate CoinGecko into the backend so authenticated users can retrieve live market data for their selected coins via a protected endpoint, with validation, mapping, error handling, Swagger, and mocked tests.
+
+**Response summary:**
+
+Added `MarketModule` with `CoinGeckoClient`, `MarketService`, and `GET /api/market` (JWT). Loads selected active coins, calls CoinGecko `/coins/markets` in one batched request, validates/maps to camelCase DTOs, and handles upstream failures safely.
+
+**Main decisions:**
+
+- Demo API auth via `x-cg-demo-api-key` header; env vars validated at startup
+- No CoinGecko call when user has no selected coins
+- Single batched `/coins/markets` request using internal `coingeckoId` values only
+- Results follow selected-coins alphabetical order by supported coin name
+- Missing CoinGecko items are omitted (no invented data)
+- Error policy: `502` upstream/auth/invalid response, `503` rate limit, `504` timeout
+- E2E overrides `CoinGeckoClient` — no live API dependency in tests
+
+**Files created or modified:**
+
+- Created: `backend/src/market/*`, `backend/test/market.e2e-spec.ts`
+- Modified: `backend/src/app.module.ts`, `backend/src/config/*`, `backend/.env.example`, `backend/test/setup-e2e-env.ts`, `docs/ai-interactions.md`, `backend/package.json`, `backend/package-lock.json`
+
+**Dependencies added:**
+
+- `@nestjs/axios`, `axios`
+
+**Migration required:**
+
+- No
+
+**Commands and tests:**
+
+- `docker compose ps` — Pass (healthy)
+- `migration:show` / `run` — Pass (no pending migrations)
+- `backend`: build, lint, test (60), test:e2e (52), audit — Pass
+- `root`: build, lint, test — Pass
+
+**Manual smoke test:**
+
+- Register → login → onboarding (coins 1,2) → `GET /api/market` — **200** in ~0.4s, 2 mapped items returned
+
+**Unresolved issues:**
+
+- E2E requires Docker PostgreSQL with migrations applied
+- Live CoinGecko availability/rate limits depend on configured Demo API key
+- Local `DB_PORT` may need to match `POSTGRES_PORT` when host `5432` is occupied
+

@@ -16,5 +16,10 @@ export function getEnvironmentVariables(
     FRONTEND_URL: configService.getOrThrow<string>('FRONTEND_URL'),
     JWT_SECRET: configService.getOrThrow<string>('JWT_SECRET'),
     JWT_EXPIRES_IN: configService.getOrThrow<string>('JWT_EXPIRES_IN'),
+    COINGECKO_BASE_URL: configService.getOrThrow<string>('COINGECKO_BASE_URL'),
+    COINGECKO_API_KEY: configService.getOrThrow<string>('COINGECKO_API_KEY'),
+    COINGECKO_TIMEOUT_MS: configService.getOrThrow<number>(
+      'COINGECKO_TIMEOUT_MS',
+    ),
   };
 }
