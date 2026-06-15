@@ -8,6 +8,7 @@ import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { CoinsModule } from './coins/coins.module';
 import { MarketModule } from './market/market.module';
+import { NewsModule } from './news/news.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { PreferencesModule } from './preferences/preferences.module';
 import { SelectedCoinsModule } from './selected-coins/selected-coins.module';
@@ -32,6 +33,7 @@ import { UsersModule } from './users/users.module';
     SelectedCoinsModule,
     OnboardingModule,
     MarketModule,
+    NewsModule,
   ],
 })
 export class AppModule {}

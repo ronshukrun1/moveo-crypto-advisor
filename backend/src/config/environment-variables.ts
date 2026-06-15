@@ -69,4 +69,16 @@ export class EnvironmentVariables {
   @IsInt()
   @Min(1)
   COINGECKO_TIMEOUT_MS: number;
+
+  @IsUrl({ require_tld: false })
+  NEWSDATA_BASE_URL: string;
+
+  @IsString()
+  @IsNotEmpty()
+  NEWSDATA_API_KEY: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  NEWSDATA_TIMEOUT_MS: number;
 }

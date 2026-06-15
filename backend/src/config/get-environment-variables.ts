@@ -21,5 +21,10 @@ export function getEnvironmentVariables(
     COINGECKO_TIMEOUT_MS: configService.getOrThrow<number>(
       'COINGECKO_TIMEOUT_MS',
     ),
+    NEWSDATA_BASE_URL: configService.getOrThrow<string>('NEWSDATA_BASE_URL'),
+    NEWSDATA_API_KEY: configService.getOrThrow<string>('NEWSDATA_API_KEY'),
+    NEWSDATA_TIMEOUT_MS: configService.getOrThrow<number>(
+      'NEWSDATA_TIMEOUT_MS',
+    ),
   };
 }

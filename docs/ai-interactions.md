@@ -445,3 +445,59 @@ Added `MarketModule` with `CoinGeckoClient`, `MarketService`, and `GET /api/mark
 - Live CoinGecko availability/rate limits depend on configured Demo API key
 - Local `DB_PORT` may need to match `POSTGRES_PORT` when host `5432` is occupied
 
+---
+
+## Stage 10: NewsData Crypto News Integration
+
+**Date:** 2026-06-15
+
+**Prompt summary:**
+
+Integrate NewsData so authenticated users can retrieve cryptocurrency news for their selected active coins via a protected endpoint with validation, mapping, pagination, duplicate removal, and mocked tests.
+
+**Response summary:**
+
+Added `NewsModule` with `NewsDataClient`, `NewsService`, and `GET /api/news` (JWT). Loads selected coins, calls NewsData crypto API in one batched request, validates/maps articles, deduplicates, sorts by publication date, and forwards pagination tokens.
+
+**Main decisions:**
+
+- NewsData auth via `apikey` query parameter; env vars validated at startup
+- No NewsData call when user has no selected coins
+- Single request with comma-separated lowercase `coin` symbols from internal DB
+- Default `limit` 5; allowed range 1–10; opaque `page` token forwarded unchanged
+- Duplicate removal: unique `article_id`, then normalized URL
+- Sort: publication date descending; invalid dates last
+- Missing `image_url` → `null`; paid-plan placeholders (`content`, `sentiment`, etc.) excluded
+- Error policy: `502` upstream/auth/malformed, `503` rate limit, `504` timeout
+- E2E overrides `NewsDataClient` — no live API in tests
+
+**Files created or modified:**
+
+- Created: `backend/src/news/*`, `backend/test/news.e2e-spec.ts`
+- Modified: `backend/src/app.module.ts`, `backend/src/config/*`, `backend/.env.example`, `backend/test/setup-e2e-env.ts`, `docs/ai-interactions.md`
+
+**Dependencies added:**
+
+- None (`@nestjs/axios` and `axios` already installed in Stage 9)
+
+**Migration required:**
+
+- No
+
+**Commands and tests:**
+
+- `docker compose ps` — Pass (healthy)
+- `migration:show` / `run` — Pass (no pending migrations)
+- `backend`: build, lint, test (73), test:e2e (61), audit — Pass
+- `root`: build, lint, test — Pass
+
+**Manual smoke test:**
+
+- Login → selected coins → `GET /api/news?limit=5` — **200** in ~1.0s, 5 mapped articles, pagination token returned
+
+**Unresolved issues:**
+
+- E2E requires Docker PostgreSQL with migrations applied
+- Live NewsData availability/rate limits depend on configured API key
+- Local `DB_PORT` may need to match `POSTGRES_PORT` when host `5432` is occupied
+

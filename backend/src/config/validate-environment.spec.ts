@@ -17,6 +17,9 @@ describe('validateEnvironment', () => {
     COINGECKO_BASE_URL: 'https://api.coingecko.com/api/v3',
     COINGECKO_API_KEY: 'test-coingecko-api-key',
     COINGECKO_TIMEOUT_MS: '5000',
+    NEWSDATA_BASE_URL: 'https://newsdata.io/api/1/crypto',
+    NEWSDATA_API_KEY: 'test-newsdata-api-key',
+    NEWSDATA_TIMEOUT_MS: '5000',
   };
 
   it('accepts a valid configuration', () => {
