@@ -5,6 +5,11 @@ import { getEnvironmentVariables } from './config/get-environment-variables';
 import { validateEnvironment } from './config/validate-environment';
 import { buildTypeOrmOptions } from './database/typeorm.config';
 import { HealthModule } from './health/health.module';
+import { AuthModule } from './auth/auth.module';
+import { CoinsModule } from './coins/coins.module';
+import { PreferencesModule } from './preferences/preferences.module';
+import { SelectedCoinsModule } from './selected-coins/selected-coins.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -18,6 +23,11 @@ import { HealthModule } from './health/health.module';
         buildTypeOrmOptions(getEnvironmentVariables(configService)),
     }),
     HealthModule,
+    UsersModule,
+    AuthModule,
+    CoinsModule,
+    PreferencesModule,
+    SelectedCoinsModule,
   ],
 })
 export class AppModule {}

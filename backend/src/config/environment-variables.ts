@@ -49,4 +49,12 @@ export class EnvironmentVariables {
 
   @IsUrl({ require_tld: false })
   FRONTEND_URL: string;
+
+  @IsString()
+  @IsNotEmpty()
+  JWT_SECRET: string;
+
+  @IsString()
+  @IsNotEmpty()
+  JWT_EXPIRES_IN: string;
 }

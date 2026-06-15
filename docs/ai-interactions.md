@@ -149,3 +149,181 @@ Implemented shared app setup, health module, global validation/error handling, S
 - E2E tests require running PostgreSQL via Docker Compose
 - If host port `5432` is occupied, align `POSTGRES_PORT` and `DB_PORT` in local env files
 
+---
+
+## Stage 4: Authentication and Users
+
+**Date:** 2026-06-15
+
+**Prompt summary:**
+
+Implement user persistence, registration, login, JWT authentication, and `GET /api/auth/me` with the first real database migration, Swagger docs, validation, and tests.
+
+**Response summary:**
+
+Added `User` entity and migration, `UsersModule` and `AuthModule` with bcrypt password hashing, JWT Passport guard/strategy, register/login/me endpoints, and unit plus E2E coverage.
+
+**Main decisions:**
+
+- **bcrypt** (12 salt rounds) for password hashing — widely used, actively maintained, built-in salt
+- Registration and login kept separate; JWT payload `{ sub, email }` only
+- Email normalized to lowercase; duplicate email returns 409 (including race-condition handling)
+- `passwordHash` never exposed in API or Swagger responses
+- `/api/auth/me` resolves user by JWT `sub`; returns 404 if user no longer exists
+
+**Files created or modified:**
+
+- Created: `backend/src/users/*`, `backend/src/auth/*`, `backend/src/database/migrations/1749998400000-CreateUsersTable.ts`, `backend/test/auth.e2e-spec.ts`
+- Modified: `backend/src/app.module.ts`, `backend/src/database/typeorm.config.ts`, `backend/src/config/*`, `backend/.env.example`, `backend/test/setup-e2e-env.ts`, `docs/ai-interactions.md`
+- Removed: `backend/src/app.controller.ts`, `backend/src/app.service.ts`, `backend/src/app.controller.spec.ts`, `backend/test/app.e2e-spec.ts`
+
+**Dependencies added:**
+
+- `@nestjs/jwt`, `@nestjs/passport`, `passport`, `passport-jwt`, `bcrypt`, `@types/passport-jwt`, `@types/bcrypt`
+
+**Migration created:**
+
+- `1749998400000-CreateUsersTable.ts` — `users` table with unique email constraint
+
+**Commands and tests:**
+
+- `docker compose up -d` / `ps` — Pass (healthy)
+- `migration:show` / `migration:run` / `migration:revert` / `migration:run` — Pass
+- `backend`: build, lint, test (19), test:e2e (13), audit — Pass
+- `root`: build, lint, test — Pass
+
+**Unresolved issues:**
+
+- E2E and migrations require Docker PostgreSQL
+- Local `DB_PORT` may need to match `POSTGRES_PORT` when host `5432` is occupied
+
+---
+
+## Stage 5: Coins Entity and Coins Module
+
+**Date:** 2026-06-15
+
+**Prompt summary:**
+
+Implement the internal cryptocurrency catalog with `Coin` entity, migration with six seeded coins, `CoinsModule`, public `GET /api/coins`, service lookup methods, Swagger, and tests.
+
+**Response summary:**
+
+Added `coins` table and migration seeding six supported assets, `CoinsModule` with repository-based service, public list endpoint returning mapped DTOs, and unit/E2E tests.
+
+**Main decisions:**
+
+- Initial coins inserted via migration (no separate seed framework)
+- Active coins sorted alphabetically by `name` for stable, user-friendly ordering
+- Response DTO excludes `isActive`, `createdAt`, `updatedAt`
+- `findByIds()` returns active coins only for future onboarding validation
+
+**Files created or modified:**
+
+- Created: `backend/src/coins/*`, `backend/src/database/migrations/1750000000000-CreateCoinsTable.ts`, `backend/test/coins.e2e-spec.ts`
+- Modified: `backend/src/app.module.ts`, `backend/src/database/typeorm.config.ts`, `docs/ai-interactions.md`
+
+**Migration created:**
+
+- `1750000000000-CreateCoinsTable.ts` — creates `coins` table and inserts BTC, ETH, SOL, XRP, DOGE, ADA
+
+**Commands and tests:**
+
+- `docker compose up -d` / `ps` — Pass (healthy)
+- `migration:show` / `run` / `revert` / `run` — Pass
+- `backend`: build, lint, test (24), test:e2e (14), audit — Pass
+- `root`: build, lint, test — Pass
+
+**Unresolved issues:**
+
+- E2E requires Docker PostgreSQL with migrations applied
+- Local `DB_PORT` may need to match `POSTGRES_PORT` when host `5432` is occupied
+
+---
+
+## Stage 6: User Preferences Entity and Module
+
+**Date:** 2026-06-15
+
+**Prompt summary:**
+
+Implement authenticated user content preferences with `UserPreference` entity, one-to-one user relation, migration, protected `GET`/`PATCH /api/preferences`, validation, Swagger, and tests.
+
+**Response summary:**
+
+Added `user_preferences` table with PostgreSQL enum for investor profile, lazy default creation on first read, partial PATCH updates, JWT-protected endpoints, and unit/E2E coverage.
+
+**Main decisions:**
+
+- PostgreSQL native enum `investor_profile_enum` for `investorProfile`
+- Lazy creation on first `GET /api/preferences` with default BEGINNER + all content flags true
+- Unique `userId` FK to `users` with `ON DELETE CASCADE`
+- Identity always from JWT; `userId` never accepted from client
+- E2E tests run with `--runInBand` to avoid shared-database race conditions
+
+**Files created or modified:**
+
+- Created: `backend/src/preferences/*`, `backend/src/database/migrations/1750100000000-CreateUserPreferencesTable.ts`, `backend/test/preferences.e2e-spec.ts`
+- Modified: `backend/src/app.module.ts`, `backend/src/database/typeorm.config.ts`, `backend/package.json`, `docs/ai-interactions.md`
+
+**Migration created:**
+
+- `1750100000000-CreateUserPreferencesTable.ts` — `user_preferences` table, enum, unique `userId`, FK cascade
+
+**Commands and tests:**
+
+- `docker compose up -d` / `ps` — Pass (healthy)
+- `migration:show` / `run` / `revert` / `run` — Pass
+- `backend`: build, lint, test (30), test:e2e (21), audit — Pass
+- `root`: build, lint, test — Pass
+
+**Unresolved issues:**
+
+- E2E requires Docker PostgreSQL with migrations applied
+- Local `DB_PORT` may need to match `POSTGRES_PORT` when host `5432` is occupied
+
+---
+
+## Stage 7: User Selected Coins
+
+**Date:** 2026-06-15
+
+**Prompt summary:**
+
+Implement authenticated user selected cryptocurrency list with `user_selected_coins` join table, migration, protected `GET`/`PUT /api/selected-coins`, validation, Swagger, and tests.
+
+**Response summary:**
+
+Added explicit `UserSelectedCoin` entity with composite primary key, atomic full-replacement updates in a transaction, active-coin validation via `CoinsService`, and JWT-protected endpoints with unit/E2E coverage.
+
+**Main decisions:**
+
+- Dedicated `UserSelectedCoin` entity to expose `createdAt` on the join table
+- Composite primary key on `(userId, coinId)` with `ON DELETE CASCADE` on both FKs
+- `PUT` performs full replacement inside a TypeORM transaction; empty `coinIds` clears all selections
+- Coin validation reuses `CoinsService.findByIds`; invalid/inactive IDs fail before any DB writes
+- Response reuses `CoinItemDto` shape from coins module; join-table fields excluded
+- Identity always from JWT; `userId` never accepted from client
+
+**Files created or modified:**
+
+- Created: `backend/src/selected-coins/*`, `backend/src/database/migrations/1750200000000-CreateUserSelectedCoinsTable.ts`, `backend/test/selected-coins.e2e-spec.ts`
+- Modified: `backend/src/app.module.ts`, `backend/src/database/typeorm.config.ts`, `docs/ai-interactions.md`
+
+**Migration created:**
+
+- `1750200000000-CreateUserSelectedCoinsTable.ts` — `user_selected_coins` table, composite PK, cascade FKs
+
+**Commands and tests:**
+
+- `docker compose up -d` / `ps` — Pass (healthy)
+- `migration:show` / `run` / `revert` / `run` — Pass
+- `backend`: build, lint, test (37), test:e2e (33), audit — Pass
+- `root`: build, lint, test — Pass
+
+**Unresolved issues:**
+
+- E2E requires Docker PostgreSQL with migrations applied
+- Local `DB_PORT` may need to match `POSTGRES_PORT` when host `5432` is occupied
+
+

@@ -18,6 +18,7 @@ async function bootstrap() {
       'Backend API for the Moveo Crypto Advisor personalized cryptocurrency dashboard.',
     )
     .setVersion('1.0')
+    .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('docs', app, document, { useGlobalPrefix: true });

@@ -14,5 +14,7 @@ export function getEnvironmentVariables(
     DB_PASSWORD: configService.getOrThrow<string>('DB_PASSWORD'),
     DB_NAME: configService.getOrThrow<string>('DB_NAME'),
     FRONTEND_URL: configService.getOrThrow<string>('FRONTEND_URL'),
+    JWT_SECRET: configService.getOrThrow<string>('JWT_SECRET'),
+    JWT_EXPIRES_IN: configService.getOrThrow<string>('JWT_EXPIRES_IN'),
   };
 }

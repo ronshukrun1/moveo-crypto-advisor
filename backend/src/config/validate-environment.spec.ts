@@ -7,6 +7,8 @@ describe('validateEnvironment', () => {
     PORT: '3000',
     NODE_ENV: NodeEnvironment.Development,
     FRONTEND_URL: 'http://localhost:5173',
+    JWT_SECRET: 'test-jwt-secret',
+    JWT_EXPIRES_IN: '1h',
     DB_HOST: 'localhost',
     DB_PORT: '5432',
     DB_USERNAME: 'moveo_user',
