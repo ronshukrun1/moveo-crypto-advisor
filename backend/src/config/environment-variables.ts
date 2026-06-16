@@ -81,4 +81,20 @@ export class EnvironmentVariables {
   @IsInt()
   @Min(1)
   NEWSDATA_TIMEOUT_MS: number;
+
+  @IsUrl({ require_tld: false })
+  OPENROUTER_BASE_URL: string;
+
+  @IsString()
+  @IsNotEmpty()
+  OPENROUTER_API_KEY: string;
+
+  @IsString()
+  @IsNotEmpty()
+  OPENROUTER_MODEL: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  OPENROUTER_TIMEOUT_MS: number;
 }

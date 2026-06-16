@@ -501,3 +501,59 @@ Added `NewsModule` with `NewsDataClient`, `NewsService`, and `GET /api/news` (JW
 - Live NewsData availability/rate limits depend on configured API key
 - Local `DB_PORT` may need to match `POSTGRES_PORT` when host `5432` is occupied
 
+---
+
+## Stage 11: OpenRouter AI Insight Integration
+
+**Date:** 2026-06-16
+
+**Prompt summary:**
+
+Integrate OpenRouter to generate a short, personalized, educational daily crypto insight for authenticated users based on investor profile, selected coins, market data, and news — without persistence, cache, or financial advice.
+
+**Response summary:**
+
+Added `InsightsModule` with `OpenRouterClient`, `InsightsService`, and `GET /api/insights/daily` (JWT). Orchestrates preferences, selected coins, `MarketService`, and `NewsService`, builds a compact fact-only prompt, calls OpenRouter chat completions, validates structured JSON output, and returns title, insight, fixed disclaimer, and `generatedAt`.
+
+**Main decisions:**
+
+- OpenRouter env vars validated at startup; Bearer auth; `POST /chat/completions` with `response_format: json_object`, temperature 0.2
+- No OpenRouter call when user has no selected coins (`400`) or market data is empty (`502`)
+- News limited to 3 headlines for compact prompts
+- Strict system prompt: facts-only, educational, no predictions or recommendations
+- Application adds fixed disclaimer; model must return exactly `title` + two-sentence `insight` JSON
+- Response validation: exact keys, two-sentence rule, recommendation phrase rejection
+- Error policy: `502` auth/upstream/malformed, `503` rate limit, `504` timeout
+- E2E overrides `OpenRouterClient`, `CoinGeckoClient`, and `NewsDataClient` — no live APIs in tests
+- Exported `MarketService` and `NewsService` for cross-module orchestration
+
+**Files created or modified:**
+
+- Created: `backend/src/insights/*`, `backend/test/insights.e2e-spec.ts`
+- Modified: `backend/src/app.module.ts`, `backend/src/config/*`, `backend/src/market/market.module.ts`, `backend/src/news/news.module.ts`, `backend/.env.example`, `backend/test/setup-e2e-env.ts`, `docs/ai-interactions.md`
+
+**Dependencies added:**
+
+- None (`@nestjs/axios` and `axios` reused from Stage 9)
+
+**Migration required:**
+
+- No
+
+**Commands and tests:**
+
+- `docker compose ps` — Pass (healthy)
+- `migration:show` / `run` — Pass (no pending migrations)
+- `backend`: build, lint, test (98), test:e2e (71), audit — Pass
+- `root`: build, lint, test — Pass
+
+**Manual smoke test:**
+
+- **200** in ~12.0s — response structure passed (`title`, `insight`, `disclaimer`, `generatedAt`); content passed safety checks (exactly two sentences, no recommendation/prediction language, no reasoning/usage/provider fields)
+
+**Unresolved issues:**
+
+- Live insight generation depends on a valid OpenRouter API key and model availability
+- E2E requires Docker PostgreSQL with migrations applied
+- Local `DB_PORT` may need to match `POSTGRES_PORT` when host `5432` is occupied
+

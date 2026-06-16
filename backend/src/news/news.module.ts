@@ -10,6 +10,6 @@ import { NewsService } from './news.service';
   imports: [HttpModule, SelectedCoinsModule, AuthModule],
   controllers: [NewsController],
   providers: [NewsService, NewsDataClient],
-  exports: [NewsDataClient],
+  exports: [NewsDataClient, NewsService],
 })
 export class NewsModule {}

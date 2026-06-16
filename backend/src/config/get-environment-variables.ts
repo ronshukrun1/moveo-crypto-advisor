@@ -26,5 +26,13 @@ export function getEnvironmentVariables(
     NEWSDATA_TIMEOUT_MS: configService.getOrThrow<number>(
       'NEWSDATA_TIMEOUT_MS',
     ),
+    OPENROUTER_BASE_URL: configService.getOrThrow<string>(
+      'OPENROUTER_BASE_URL',
+    ),
+    OPENROUTER_API_KEY: configService.getOrThrow<string>('OPENROUTER_API_KEY'),
+    OPENROUTER_MODEL: configService.getOrThrow<string>('OPENROUTER_MODEL'),
+    OPENROUTER_TIMEOUT_MS: configService.getOrThrow<number>(
+      'OPENROUTER_TIMEOUT_MS',
+    ),
   };
 }

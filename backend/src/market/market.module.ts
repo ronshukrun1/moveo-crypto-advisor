@@ -10,6 +10,6 @@ import { MarketService } from './market.service';
   imports: [HttpModule, SelectedCoinsModule, AuthModule],
   controllers: [MarketController],
   providers: [MarketService, CoinGeckoClient],
-  exports: [CoinGeckoClient],
+  exports: [CoinGeckoClient, MarketService],
 })
 export class MarketModule {}

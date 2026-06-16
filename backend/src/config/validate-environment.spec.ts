@@ -20,6 +20,10 @@ describe('validateEnvironment', () => {
     NEWSDATA_BASE_URL: 'https://newsdata.io/api/1/crypto',
     NEWSDATA_API_KEY: 'test-newsdata-api-key',
     NEWSDATA_TIMEOUT_MS: '5000',
+    OPENROUTER_BASE_URL: 'https://openrouter.ai/api/v1',
+    OPENROUTER_API_KEY: 'test-openrouter-api-key',
+    OPENROUTER_MODEL: 'openai/gpt-oss-20b:free',
+    OPENROUTER_TIMEOUT_MS: '10000',
   };
 
   it('accepts a valid configuration', () => {
