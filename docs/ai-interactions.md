@@ -903,3 +903,32 @@ Added `InsightsService.generateFromData()` and `MemesService.generateFromMarketD
 **Automated verification:** backend unit/E2E tests with mocked NewsData — pass.
 
 **Remaining limitations:** pages may still return fewer than the requested `limit`; no AI classification; no automatic extra upstream fetches to fill a page.
+
+---
+
+## Bonus: Feedback and future model improvement (documentation only)
+
+**Date:** 2026-06-16
+
+**Prompt summary:**
+
+Add a bonus write-up on how user feedback in this dashboard could support future model training and improvement — documentation only, no implementation.
+
+**Response summary:**
+
+Added `docs/bonus-feedback-and-model-improvement.md` describing current feedback storage (`feedback` table, stable `contentId`s, joins to `daily_insights` / `daily_memes` snapshots), the live vote flow, and a staged proposal for offline analytics, prompt/rule tuning, insight preference datasets (DPO/RLHF-style), and evaluation before rollout. Linked from root `README.md`.
+
+**Main decisions:**
+
+- Standalone bonus doc rather than embedding a long section in backend README
+- Ground proposal in existing schema (`sourceDataSnapshot`, investor profile, content types)
+- Explicit scope boundary: no ETL, fine-tuning, or live personalization implemented
+
+**Files created or modified:**
+
+- Created: `docs/bonus-feedback-and-model-improvement.md`
+- Modified: `README.md`, `docs/ai-interactions.md`
+
+**Unresolved issues:**
+
+- None (by design — proposal only)

@@ -46,7 +46,8 @@ moveo-crypto-advisor/
 ├── frontend/                 # React + Vite scaffold
 │   └── README.md             # Frontend status
 └── docs/
-    └── ai-interactions.md    # Development log (implementation history)
+    ├── ai-interactions.md                      # Development log (implementation history)
+    └── bonus-feedback-and-model-improvement.md # Bonus: feedback → future model improvement (proposal)
 ```
 
 ## Current Status
@@ -67,3 +68,4 @@ moveo-crypto-advisor/
 | [backend/README.md](./backend/README.md) | Backend architecture, modules, endpoints, and behavior |
 | [frontend/README.md](./frontend/README.md) | Frontend scaffold status |
 | [docs/ai-interactions.md](./docs/ai-interactions.md) | Incremental development log |
+| [docs/bonus-feedback-and-model-improvement.md](./docs/bonus-feedback-and-model-improvement.md) | Bonus: how feedback is stored and how it could improve models (proposal only) |
