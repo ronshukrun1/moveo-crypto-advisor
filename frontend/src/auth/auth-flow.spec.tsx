@@ -14,6 +14,7 @@ import { renderWithProviders } from '../test/test-utils';
 import * as authApi from '../api/auth';
 import * as coinsApi from '../api/coins';
 import * as dashboardApi from '../api/dashboard';
+import * as feedbackApi from '../api/feedback';
 import { setStoredToken, clearStoredToken } from '../auth/auth-storage';
 import { ApiError } from '../api/api-error';
 import { mockDashboardResponse } from '../dashboard/dashboard.fixtures';
@@ -21,6 +22,7 @@ import { mockDashboardResponse } from '../dashboard/dashboard.fixtures';
 vi.mock('../api/auth');
 vi.mock('../api/coins');
 vi.mock('../api/dashboard');
+vi.mock('../api/feedback');
 
 const incompleteUser = {
   id: 1,
@@ -65,6 +67,7 @@ describe('authentication flows', () => {
       items: [{ id: 1, coingeckoId: 'bitcoin', symbol: 'btc', name: 'Bitcoin' }],
     });
     vi.mocked(dashboardApi.getDashboard).mockResolvedValue(mockDashboardResponse);
+    vi.mocked(feedbackApi.getFeedback).mockResolvedValue({ items: [] });
   });
 
   it('register form includes name, email, password, and confirm password fields', () => {

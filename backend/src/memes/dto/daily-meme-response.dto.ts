@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class DailyMemeResponseDto {
   @ApiProperty({ example: 'https://i.imgflip.com/example.jpg' })
@@ -15,4 +15,7 @@ export class DailyMemeResponseDto {
 
   @ApiProperty({ example: '2026-06-16T10:00:00.000Z' })
   generatedAt: string;
+
+  @ApiPropertyOptional({ example: 'daily-meme:456' })
+  feedbackContentId?: string;
 }

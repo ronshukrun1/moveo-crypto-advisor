@@ -44,6 +44,9 @@ export class NewsItemDto {
     nullable: true,
   })
   publishedAt: string | null;
+
+  @ApiProperty({ example: 'article-id' })
+  feedbackContentId: string;
 }
 
 export class NewsListResponseDto {

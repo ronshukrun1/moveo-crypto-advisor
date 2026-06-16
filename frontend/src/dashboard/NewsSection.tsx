@@ -8,12 +8,14 @@ import { DASHBOARD_SECTION_COPY } from './constants';
 import { DisabledSectionContent } from './DisabledSectionContent';
 import { NewsItem } from './NewsItem';
 import type { DashboardNewsSection } from './dashboard.types';
+import type { DashboardFeedbackController } from './use-dashboard-feedback';
 
 interface NewsSectionProps {
   section: DashboardNewsSection;
+  feedback: DashboardFeedbackController;
 }
 
-export function NewsSection({ section }: NewsSectionProps) {
+export function NewsSection({ section, feedback }: NewsSectionProps) {
   const staleNotice = section.isStale ? (
     <Box sx={{ mb: 2 }}>
       <StaleDataNotice message={DASHBOARD_SECTION_COPY.news.stale} />
@@ -31,9 +33,15 @@ export function NewsSection({ section }: NewsSectionProps) {
         >
           {staleNotice}
           {section.items && section.items.length > 0 ? (
-            <Box>
+            <Box
+              sx={{
+                maxHeight: { md: 520 },
+                overflowY: { md: 'auto' },
+                overflowX: 'hidden',
+              }}
+            >
               {section.items.map((item) => (
-                <NewsItem key={item.id} item={item} />
+                <NewsItem key={item.id} item={item} feedback={feedback} />
               ))}
             </Box>
           ) : (

@@ -2,12 +2,15 @@ import { NewsDataArticle } from '../interfaces/news-data.interfaces';
 import {
   filterNewsArticlesByRelevance,
   isArticleRelevantToSelectedCoins,
+  isMeaningfulCoingeckoIdForMatching,
   SelectedCoinForRelevance,
 } from './news-relevance-filter';
 
 const selectedCoins: SelectedCoinForRelevance[] = [
   { name: 'Bitcoin', symbol: 'BTC', coingeckoId: 'bitcoin' },
   { name: 'Ethereum', symbol: 'ETH', coingeckoId: 'ethereum' },
+  { name: 'Dogecoin', symbol: 'DOGE', coingeckoId: 'dogecoin' },
+  { name: 'XRP', symbol: 'XRP', coingeckoId: 'ripple' },
 ];
 
 function createArticle(
@@ -31,31 +34,20 @@ function createArticle(
 }
 
 describe('news relevance filter', () => {
-  it('retains an article when relatedCoins contains BTC and title contains Bitcoin', () => {
+  it('retains an article when the title contains the selected coin name', () => {
     const article = createArticle({
-      article_id: 'btc-etf',
-      title: 'Bitcoin ETF outflows continue',
-      coin: ['BTC'],
+      article_id: 'btc-title',
+      title: 'Bitcoin falls after market volatility',
+      coin: [],
     });
 
     expect(isArticleRelevantToSelectedCoins(article, selectedCoins)).toBe(true);
   });
 
-  it('retains an article when description contains Ethereum', () => {
+  it('retains an article when the title contains a standalone selected symbol', () => {
     const article = createArticle({
-      article_id: 'eth-staking',
-      title: 'Network update',
-      description: 'Ethereum staking rewards increased this week',
-      coin: ['ETH'],
-    });
-
-    expect(isArticleRelevantToSelectedCoins(article, selectedCoins)).toBe(true);
-  });
-
-  it('retains an article when title contains standalone ETH', () => {
-    const article = createArticle({
-      article_id: 'eth-title',
-      title: 'ETH staking rewards rise',
+      article_id: 'btc-symbol-title',
+      title: 'BTC rebounds after sell-off',
       description: null,
       coin: [],
     });
@@ -63,7 +55,29 @@ describe('news relevance filter', () => {
     expect(isArticleRelevantToSelectedCoins(article, selectedCoins)).toBe(true);
   });
 
-  it('removes an article when relatedCoins contains BTC but title and description are unrelated', () => {
+  it('retains an article when the description contains the selected coin name', () => {
+    const article = createArticle({
+      article_id: 'btc-description',
+      title: 'Market recap',
+      description: 'Bitcoin trading volume increased during the session.',
+      coin: [],
+    });
+
+    expect(isArticleRelevantToSelectedCoins(article, selectedCoins)).toBe(true);
+  });
+
+  it('retains an article when the description contains a standalone selected symbol', () => {
+    const article = createArticle({
+      article_id: 'eth-description',
+      title: 'Network update',
+      description: 'ETH staking rewards increased this week.',
+      coin: [],
+    });
+
+    expect(isArticleRelevantToSelectedCoins(article, selectedCoins)).toBe(true);
+  });
+
+  it('removes an article when relatedCoins matches but title and description do not mention the coin', () => {
     const article = createArticle({
       article_id: 'gold-price',
       title: 'Gold prices surge on geopolitical tension',
@@ -74,6 +88,41 @@ describe('news relevance filter', () => {
     expect(isArticleRelevantToSelectedCoins(article, selectedCoins)).toBe(
       false,
     );
+  });
+
+  it('removes an article that mentions only unselected coins', () => {
+    const article = createArticle({
+      article_id: 'sol-only',
+      title: 'Solana ecosystem growth accelerates',
+      description: 'SOL network activity reached a new high.',
+      coin: ['SOL'],
+    });
+
+    expect(isArticleRelevantToSelectedCoins(article, selectedCoins)).toBe(
+      false,
+    );
+  });
+
+  it('retains a multi-coin article when one selected coin appears in the preview text', () => {
+    const article = createArticle({
+      article_id: 'multi-coin',
+      title: 'Solana and Cardano lead altcoin gains',
+      description: 'Bitcoin also moved higher during the session.',
+      coin: ['SOL', 'ADA', 'BTC'],
+    });
+
+    expect(isArticleRelevantToSelectedCoins(article, selectedCoins)).toBe(true);
+  });
+
+  it('handles missing description safely', () => {
+    const article = createArticle({
+      article_id: 'btc-title-only',
+      title: 'BTC rebounds after sell-off',
+      description: null,
+      coin: ['BTC'],
+    });
+
+    expect(isArticleRelevantToSelectedCoins(article, selectedCoins)).toBe(true);
   });
 
   it('does not match short symbols inside unrelated words', () => {
@@ -89,39 +138,27 @@ describe('news relevance filter', () => {
     );
   });
 
-  it('retains a multi-coin article when one selected coin matches', () => {
+  it('matches coin names case-insensitively', () => {
     const article = createArticle({
-      article_id: 'multi-coin',
-      title: 'Bitcoin and Solana market recap',
-      description: 'Bitcoin led gains while Solana followed.',
-      coin: ['BTC', 'SOL'],
-    });
-
-    expect(isArticleRelevantToSelectedCoins(article, selectedCoins)).toBe(true);
-  });
-
-  it('removes an article that matches only an unselected coin', () => {
-    const article = createArticle({
-      article_id: 'sol-only',
-      title: 'Solana ecosystem growth accelerates',
-      description: 'SOL network activity reached a new high.',
-      coin: ['SOL'],
-    });
-
-    expect(isArticleRelevantToSelectedCoins(article, selectedCoins)).toBe(
-      false,
-    );
-  });
-
-  it('handles missing description safely', () => {
-    const article = createArticle({
-      article_id: 'btc-title-only',
-      title: 'BTC rebounds after sell-off',
+      article_id: 'btc-case',
+      title: 'bitcoin ETF outflows continue',
       description: null,
-      coin: ['BTC'],
+      coin: [],
     });
 
     expect(isArticleRelevantToSelectedCoins(article, selectedCoins)).toBe(true);
+  });
+
+  it('matches meaningful coingecko ids in preview text', () => {
+    const article = createArticle({
+      article_id: 'doge-id',
+      title: 'Dogecoin community update',
+      description: 'Developers discussed dogecoin network upgrades.',
+      coin: [],
+    });
+
+    expect(isArticleRelevantToSelectedCoins(article, selectedCoins)).toBe(true);
+    expect(isMeaningfulCoingeckoIdForMatching('dogecoin')).toBe(true);
   });
 
   it('filters a list of articles by selected coins', () => {
@@ -134,6 +171,7 @@ describe('news relevance filter', () => {
       createArticle({
         article_id: 'irrelevant',
         title: 'Gold prices surge',
+        description: 'Precious metals rallied.',
         coin: ['BTC'],
       }),
     ];

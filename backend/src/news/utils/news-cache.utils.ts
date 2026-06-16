@@ -2,6 +2,8 @@ import { createHash } from 'crypto';
 
 export type NewsCacheLayer = 'fresh' | 'stale';
 
+const NEWS_CACHE_KEY_VERSION = 'v2';
+
 function encodePageToken(page?: string): string {
   const trimmed = page?.trim();
 
@@ -22,5 +24,5 @@ export function buildNewsCacheKey(
     .map((symbol) => symbol.toUpperCase())
     .sort();
 
-  return `news:${layer}:${sortedSymbols.join(',')}:limit=${limit}:page=${encodePageToken(page)}`;
+  return `news:${NEWS_CACHE_KEY_VERSION}:${layer}:${sortedSymbols.join(',')}:limit=${limit}:page=${encodePageToken(page)}`;
 }

@@ -9,12 +9,15 @@ import { SectionState } from '../components/states/SectionState';
 import { DASHBOARD_SECTION_COPY } from './constants';
 import { DisabledSectionContent } from './DisabledSectionContent';
 import type { DashboardMemeSection } from './dashboard.types';
+import { FeedbackControls } from './FeedbackControls';
+import type { DashboardFeedbackController } from './use-dashboard-feedback';
 
 interface MemeSectionProps {
   section: DashboardMemeSection;
+  feedback: DashboardFeedbackController;
 }
 
-export function MemeSection({ section }: MemeSectionProps) {
+export function MemeSection({ section, feedback }: MemeSectionProps) {
   const [imageFailed, setImageFailed] = useState(false);
 
   return (
@@ -90,6 +93,19 @@ export function MemeSection({ section }: MemeSectionProps) {
                   View source
                 </Link>
               ) : null}
+
+              <FeedbackControls
+                currentVote={feedback.getVote('MEME', section.data.feedbackContentId)}
+                disabled={feedback.isSaving('MEME', section.data.feedbackContentId)}
+                error={feedback.getError('MEME', section.data.feedbackContentId)}
+                onVote={(feedbackType) => {
+                  void feedback.vote(
+                    'MEME',
+                    section.data!.feedbackContentId,
+                    feedbackType,
+                  );
+                }}
+              />
             </Box>
           ) : null}
         </SectionState>

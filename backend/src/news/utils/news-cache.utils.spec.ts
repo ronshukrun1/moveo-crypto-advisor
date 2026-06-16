@@ -5,7 +5,7 @@ describe('news cache utils', () => {
     const first = buildNewsCacheKey(['ETH', 'BTC'], 5, undefined, 'fresh');
     const second = buildNewsCacheKey(['BTC', 'ETH'], 5, undefined, 'fresh');
 
-    expect(first).toBe('news:fresh:BTC,ETH:limit=5:page=first');
+    expect(first).toBe('news:v2:fresh:BTC,ETH:limit=5:page=first');
     expect(second).toBe(first);
   });
 
@@ -13,8 +13,8 @@ describe('news cache utils', () => {
     const fresh = buildNewsCacheKey(['BTC'], 5, undefined, 'fresh');
     const stale = buildNewsCacheKey(['BTC'], 5, undefined, 'stale');
 
-    expect(fresh).toBe('news:fresh:BTC:limit=5:page=first');
-    expect(stale).toBe('news:stale:BTC:limit=5:page=first');
+    expect(fresh).toBe('news:v2:fresh:BTC:limit=5:page=first');
+    expect(stale).toBe('news:v2:stale:BTC:limit=5:page=first');
     expect(fresh).not.toBe(stale);
   });
 
@@ -30,5 +30,12 @@ describe('news cache utils', () => {
     const secondPage = buildNewsCacheKey(['BTC'], 5, 'page-token', 'fresh');
 
     expect(firstPage).not.toBe(secondPage);
+  });
+
+  it('uses a cache-key version that prevents reuse of older filtered entries', () => {
+    const key = buildNewsCacheKey(['BTC'], 5, undefined, 'fresh');
+
+    expect(key.startsWith('news:v2:')).toBe(true);
+    expect(key).not.toBe('news:fresh:BTC:limit=5:page=first');
   });
 });

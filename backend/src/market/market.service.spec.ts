@@ -40,6 +40,7 @@ describe('MarketService', () => {
     priceChange24h: 1395.9,
     changePercentage24h: 2.17,
     lastUpdated: '2026-06-15T06:11:30.617Z',
+    feedbackContentId: 'coin:1',
   };
 
   beforeEach(async () => {
@@ -354,6 +355,7 @@ describe('MarketService', () => {
         priceChange24h: 1395.9,
         changePercentage24h: 2.17,
         lastUpdated: '2026-06-15T06:11:30.617Z',
+        feedbackContentId: 'coin:1',
       },
     ]);
     expect(result.items[0]).not.toHaveProperty('current_price');
@@ -405,6 +407,7 @@ describe('MarketService', () => {
       priceChange24h: null,
       changePercentage24h: null,
       lastUpdated: null,
+      feedbackContentId: 'coin:1',
     });
   });
 

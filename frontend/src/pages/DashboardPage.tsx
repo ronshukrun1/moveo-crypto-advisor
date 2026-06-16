@@ -12,6 +12,7 @@ import { DashboardGrid } from '../dashboard/DashboardGrid';
 import { DashboardSkeleton } from '../dashboard/DashboardSkeleton';
 import { PreferencesLink } from '../dashboard/PreferencesLink';
 import { useDashboard } from '../dashboard/use-dashboard';
+import { useDashboardFeedback } from '../dashboard/use-dashboard-feedback';
 import { formatIsoDateTime } from '../utils/formatting';
 
 function getPageErrorMessage(statusCode?: number): { title: string; message: string } {
@@ -30,6 +31,7 @@ function getPageErrorMessage(statusCode?: number): { title: string; message: str
 
 export function DashboardPage() {
   const { dashboard, phase, error, refresh, retry } = useDashboard();
+  const feedback = useDashboardFeedback(dashboard);
   const isInitialLoading = phase === 'initial' && !dashboard;
   const isRefreshing = phase === 'refreshing';
   const showRefreshError = Boolean(error && dashboard);
@@ -141,7 +143,7 @@ export function DashboardPage() {
           </Alert>
         ) : null}
 
-        <DashboardGrid dashboard={dashboard} />
+        <DashboardGrid dashboard={dashboard} feedback={feedback} />
       </PageContainer>
     </AppShell>
   );

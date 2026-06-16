@@ -18,4 +18,5 @@ export const endpoints = {
     daily: '/memes/daily',
   },
   dashboard: '/dashboard',
+  feedback: '/feedback',
 } as const;

@@ -17,6 +17,7 @@ import {
   INSIGHT_DISCLAIMER,
   INSIGHT_NEWS_LIMIT,
 } from './constants/insight.constants';
+import { buildInsightFeedbackContentId } from '../feedback/utils/feedback-content-id.utils';
 import { DailyInsightResponseDto } from './dto/daily-insight-response.dto';
 import { DailyInsight } from './entities/daily-insight.entity';
 import { InsightGenerationInput } from './interfaces/insight-generation.interfaces';
@@ -192,6 +193,7 @@ export class InsightsService {
       insight: stored.content,
       disclaimer: INSIGHT_DISCLAIMER,
       generatedAt: stored.updatedAt.toISOString(),
+      feedbackContentId: buildInsightFeedbackContentId(stored.id),
     };
   }
 

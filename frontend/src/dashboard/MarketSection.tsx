@@ -8,12 +8,14 @@ import { DASHBOARD_SECTION_COPY } from './constants';
 import { DisabledSectionContent } from './DisabledSectionContent';
 import { MarketItem } from './MarketItem';
 import type { DashboardMarketSection } from './dashboard.types';
+import type { DashboardFeedbackController } from './use-dashboard-feedback';
 
 interface MarketSectionProps {
   section: DashboardMarketSection;
+  feedback: DashboardFeedbackController;
 }
 
-export function MarketSection({ section }: MarketSectionProps) {
+export function MarketSection({ section, feedback }: MarketSectionProps) {
   const staleNotice = section.isStale ? (
     <Box sx={{ mb: 2 }}>
       <StaleDataNotice message={DASHBOARD_SECTION_COPY.market.stale} />
@@ -33,7 +35,7 @@ export function MarketSection({ section }: MarketSectionProps) {
           {section.items && section.items.length > 0 ? (
             <Box>
               {section.items.map((item) => (
-                <MarketItem key={item.id} item={item} />
+                <MarketItem key={item.id} item={item} feedback={feedback} />
               ))}
             </Box>
           ) : (

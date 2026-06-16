@@ -1,4 +1,5 @@
 import { NewsDataArticle } from '../interfaces/news-data.interfaces';
+import { buildNewsFeedbackContentId } from '../../feedback/utils/feedback-content-id.utils';
 import { NewsItemDto } from '../dto/news-response.dto.js';
 
 function parsePublishedAt(pubDate: string | null): string | null {
@@ -31,5 +32,6 @@ export function toNewsItemDto(article: NewsDataArticle): NewsItemDto {
     creator: article.creator ?? null,
     relatedCoins: article.coin?.map((symbol) => symbol.toUpperCase()) ?? null,
     publishedAt: parsePublishedAt(article.pubDate),
+    feedbackContentId: buildNewsFeedbackContentId(article.article_id),
   };
 }

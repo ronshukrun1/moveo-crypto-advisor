@@ -36,6 +36,7 @@ export interface MarketItem {
   priceChange24h: number | null;
   changePercentage24h: number | null;
   lastUpdated: string | null;
+  feedbackContentId: string;
 }
 
 export interface DashboardMarketSection {
@@ -56,6 +57,7 @@ export interface NewsItem {
   creator: string[] | null;
   relatedCoins: string[] | null;
   publishedAt: string | null;
+  feedbackContentId: string;
 }
 
 export interface DashboardNewsSection {
@@ -71,6 +73,7 @@ export interface DailyInsight {
   insight: string;
   disclaimer: string;
   generatedAt: string;
+  feedbackContentId: string;
 }
 
 export interface DashboardInsightSection {
@@ -85,6 +88,7 @@ export interface DailyMeme {
   textTop: string;
   textBottom: string;
   generatedAt: string;
+  feedbackContentId: string;
 }
 
 export interface DashboardMemeSection {

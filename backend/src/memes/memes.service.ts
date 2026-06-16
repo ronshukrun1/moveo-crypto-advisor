@@ -37,6 +37,7 @@ import {
   getTemplateAttemptOrder,
   selectMemeVariation,
 } from './utils/meme-variation.utils';
+import { buildMemeFeedbackContentId } from '../feedback/utils/feedback-content-id.utils';
 import type { PreviousDayMemeSelection } from './interfaces/meme-generation.interfaces';
 
 @Injectable()
@@ -306,6 +307,7 @@ export class MemesService {
       textTop: stored.textTop,
       textBottom: stored.textBottom,
       generatedAt: stored.updatedAt.toISOString(),
+      feedbackContentId: buildMemeFeedbackContentId(stored.id),
     };
   }
 

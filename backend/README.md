@@ -63,6 +63,7 @@ Client
 | `NewsModule` | NewsData articles |
 | `InsightsModule` | OpenRouter educational insight |
 | `MemesModule` | Imgflip meme generation |
+| `FeedbackModule` | User thumbs-up/down content feedback |
 | `DashboardModule` | Aggregated dashboard response |
 
 ---
@@ -101,6 +102,8 @@ Global prefix: `/api`.
 | `GET` | `/news` | JWT | News articles | `200` | `400`, `401`, `404`, `502`, `503`, `504` |
 | `GET` | `/insights/daily` | JWT | AI insight | `200` | `400`, `401`, `502`, `503`, `504` |
 | `GET` | `/memes/daily` | JWT | Meme image | `200` | `400`, `401`, `502`, `503`, `504` |
+| `GET` | `/feedback` | JWT | Batch read user votes | `200` | `400`, `401` |
+| `PUT` | `/feedback` | JWT | Upsert vote (UP/DOWN) | `200` | `400`, `401`, `404` |
 | `GET` | `/dashboard` | JWT | Full dashboard | `200` | `400`, `401`, `404`, `409`, `500` |
 
 ### `GET /api/news` query parameters
@@ -111,6 +114,43 @@ Global prefix: `/api`.
 | `page` | string | — | Opaque NewsData pagination token (max 500 chars) |
 
 `GET /api/dashboard` rejects unknown query parameters (`400`).
+
+### Feedback (`PUT` / `GET /api/feedback`)
+
+Authenticated users can vote **UP** or **DOWN** on dashboard content. Identity comes only from the JWT; client-supplied `userId` is rejected.
+
+**Content types:** `MARKET`, `NEWS`, `INSIGHT`, `MEME`
+
+**Vote behavior:**
+
+- One row per `(userId, contentType, contentId)` — repeating the same vote is idempotent.
+- Changing UP → DOWN (or DOWN → UP) updates the existing row; no duplicate rows.
+- Clicking the currently selected vote again keeps it selected (no DELETE endpoint in this stage).
+
+**Stable content IDs** (returned on dashboard items as `feedbackContentId`):
+
+| Section | `contentType` | `contentId` example |
+|---------|---------------|---------------------|
+| Coin Prices | `MARKET` | `coin:1` (internal coin id) |
+| Market News | `NEWS` | article id, e.g. `article-1` |
+| AI Insight | `INSIGHT` | `daily-insight:123` (persisted row id) |
+| Crypto Meme | `MEME` | `daily-meme:456` (persisted row id) |
+
+`PUT /api/feedback` body:
+
+```json
+{
+  "contentType": "INSIGHT",
+  "contentId": "daily-insight:123",
+  "feedbackType": "UP"
+}
+```
+
+`GET /api/feedback?contentIds=coin:1,article-1,daily-insight:123` returns the authenticated user's matching votes for dashboard batch loading.
+
+The service validates that referenced content exists and is visible to the user (selected active coin, owned daily insight/meme, non-empty news id). Stored feedback is for future personalization and offline evaluation — **no model training or recommendation changes are implemented**.
+
+**Future use (not implemented):** content ranking, prompt personalization, relevance scoring, supervised preference datasets, and offline model evaluation.
 
 ---
 
@@ -153,6 +193,7 @@ Never returned to clients: stack traces, SQL errors, password hashes, API keys, 
 | `user_selected_coins` | User-to-coin selections |
 | `daily_insights` | One persisted AI insight per user per UTC day |
 | `daily_memes` | One persisted meme per user per UTC day |
+| `feedback` | User thumbs-up/down votes on dashboard content |
 | `migrations` | TypeORM migration history (internal) |
 
 ### Migrations
@@ -166,6 +207,13 @@ Existing migrations:
 - `CreateUserPreferencesTable`
 - `CreateUserSelectedCoinsTable`
 - `CreateDailyContentTables`
+- `CreateFeedbackTable`
+
+### Feedback entity
+
+Table `feedback`: `id`, `userId` (FK → `users.id`, `ON DELETE CASCADE`), `contentType`, `contentId`, `feedbackType`, `createdAt`, `updatedAt`.
+
+Unique constraint on `(userId, contentType, contentId)`. Enums: `contentType` ∈ `MARKET | NEWS | INSIGHT | MEME`; `feedbackType` ∈ `UP | DOWN`. No raw provider responses, JWTs, emails, prompts, or secrets are stored.
 
 ### Daily insight and meme persistence
 
@@ -196,7 +244,7 @@ Stale TTL must be **≥** the corresponding fresh TTL (validated at startup).
 | Cache | Key basis |
 |-------|-----------|
 | Market | `market:{fresh\|stale}:usd:{sorted-coingecko-ids}` — e.g. `market:fresh:usd:bitcoin,ethereum` |
-| News | `news:{fresh\|stale}:{sorted-symbols}:limit={n}:page={first\|hash}` — e.g. `news:fresh:BTC,ETH:limit=5:page=first` |
+| News | `news:v2:{fresh\|stale}:{sorted-symbols}:limit={n}:page={first\|hash}` — e.g. `news:v2:fresh:BTC,ETH:limit=5:page=first` |
 
 **Flow:** fresh hit → return cached data; fresh miss → call provider; on success store in **both** fresh and stale layers; on failure look up stale only (after the provider attempt) and return last-known mapped data if present. Provider errors are never cached. Empty successful responses may be stored. Cache read/write failures log a sanitized warning and fall back to provider calls or return provider data. The cache is local to one backend process and **clears on restart** — after restart, provider failure with no repopulated stale entry preserves existing error behavior.
 
@@ -213,7 +261,7 @@ Keys are **not** user-specific. Only safe mapped internal responses are stored (
 | CoinGecko | Market prices, 24h change, highs/lows | API key header |
 | NewsData | Crypto news for selected symbols | API key query param |
 
-NewsData results are filtered server-side after mapping and deduplication. An article is kept only when it matches at least one selected coin by symbol/name in `title`, `description`, and `relatedCoins` metadata. Filtering is deterministic (no AI classification). A page may return fewer items than the requested `limit` when loosely tagged articles are removed; `nextPage` from the upstream response is preserved without automatic extra fetches.
+NewsData results are filtered server-side after mapping and deduplication. An article is kept only when at least one selected coin is explicitly mentioned in the article `title` or `description` (coin name, standalone symbol, or meaningful CoinGecko id). Provider `relatedCoins` metadata may support mapping but is **not** sufficient on its own. Filtering is deterministic (no AI classification). A page may return fewer items than the requested `limit`; `nextPage` from the upstream response is preserved without automatic extra fetches.
 
 | OpenRouter | Educational insight JSON | Bearer API key |
 | Imgflip | Meme image from template + captions | **Username and password** (form POST) |
@@ -277,7 +325,8 @@ See [../RUN.md](../RUN.md) for full quality commands.
 - News pages may return fewer than the requested `limit` after relevance filtering; no automatic extra NewsData fetches are made to fill a page.
 - Dashboard latency is dominated by OpenRouter (and Imgflip when enabled).
 - Free-tier external API rate limits may affect manual testing.
-- Frontend product UI and API integration are not implemented in this repository.
+- Feedback votes are stored but do not yet change ranking, prompts, or recommendations.
+- No aggregate vote counts, delete-vote endpoint, or admin analytics for feedback.
 
 ---
 

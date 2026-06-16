@@ -122,6 +122,7 @@ JWT is not decoded client-side.
 - Auth API functions are implemented in `src/api/auth.ts` (register, login, current user)
 - Onboarding API functions in `src/api/onboarding.ts` and `src/api/coins.ts`
 - Dashboard API function in `src/api/dashboard.ts` (`GET /api/dashboard` only — no standalone market/news/insight/meme calls from the dashboard page)
+- Feedback API functions in `src/api/feedback.ts` (`PUT` / `GET /api/feedback`)
 
 ---
 
@@ -142,7 +143,18 @@ Each section supports backend statuses `available`, `unavailable`, and `disabled
 
 **Preferences:** links to `/preferences` open the settings page for onboarding-completed users.
 
-**Not implemented on dashboard:** feedback voting, charts, sentiment labels, confidence scores, AI/meme regeneration.
+**Feedback voting:** each votable item exposes a stable `feedbackContentId` from the dashboard response. On mount, the page batch-loads existing votes via `GET /api/feedback?contentIds=…`. Thumbs-up/down controls use neutral wording (“Was this useful?”, “Helpful”, “Not helpful”) with accessible labels (“Mark as helpful”, “Mark as not helpful”). Voting calls `PUT /api/feedback` only — it does not refetch the full dashboard or regenerate insight/meme. Controls disable while saving; if feedback loading fails, dashboard content still renders with neutral vote state. Re-clicking the selected vote keeps it selected (no delete endpoint).
+
+**Dashboard feedback identifiers:**
+
+| Section | Example `feedbackContentId` |
+|---------|----------------------------|
+| Coin Prices | `coin:1` |
+| Market News | article id |
+| AI Insight | `daily-insight:123` |
+| Crypto Meme | `daily-meme:456` |
+
+**Not implemented on dashboard:** aggregate vote counts, charts, sentiment labels, confidence scores, AI/meme regeneration.
 
 Visual layout follows the approved dashboard screenshot (dark two-column card grid, turquoise accents).
 
@@ -238,15 +250,18 @@ Independent changed requests run concurrently. After save, the page re-fetches p
 
 ---
 
-## Current stage limitations (Stage 23)
+## Current stage limitations (Stage 24)
 
-**Implemented:** real dashboard UI, preferences editor (`/preferences`) with separate save operations and partial-failure handling, and shared onboarding option definitions.
+**Implemented:** real dashboard UI with thumbs-up/down feedback on Market News, Coin Prices, AI Insight, and Crypto Meme; preferences editor (`/preferences`); batch feedback loading on dashboard mount; vote upsert without full dashboard refetch.
+
+**Vote behavior:** clicking the same vote again keeps it selected (idempotent upsert). No DELETE endpoint. Changing UP ↔ DOWN updates the existing row.
 
 **Not yet implemented:**
 
 - Google OAuth
 - Token refresh and password reset
-- Feedback voting on insight or meme
+- Aggregate vote counts or public statistics
+- Model training, recommendation algorithms, or prompt personalization based on votes
 - Charts, sentiment labels, confidence scores
 - AI or meme regeneration and section-specific refresh
 - Persisting incomplete onboarding drafts across refresh
@@ -263,7 +278,7 @@ Design screenshots used as references (dark theme, turquoise accent, card/input/
 - Onboarding selection cards
 - Dashboard four-panel grid
 
-Screenshots are not copied literally where they show unsupported product features (Google auth, feedback buttons, sentiment/confidence scores, etc.).
+Screenshots are not copied literally where they show unsupported product features (Google auth, aggregate vote statistics, sentiment/confidence scores, etc.).
 
 ---
 

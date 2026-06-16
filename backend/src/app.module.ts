@@ -5,6 +5,7 @@ import { AppCacheModule } from './cache/cache.module';
 import { getEnvironmentVariables } from './config/get-environment-variables';
 import { validateEnvironment } from './config/validate-environment';
 import { buildTypeOrmOptions } from './database/typeorm.config';
+import { FeedbackModule } from './feedback/feedback.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { MemesModule } from './memes/memes.module';
 import { InsightsModule } from './insights/insights.module';
@@ -41,6 +42,7 @@ import { UsersModule } from './users/users.module';
     NewsModule,
     InsightsModule,
     MemesModule,
+    FeedbackModule,
     DashboardModule,
   ],
 })

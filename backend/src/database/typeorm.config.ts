@@ -1,4 +1,5 @@
 import { join } from 'path';
+import { Feedback } from '../feedback/entities/feedback.entity';
 import { DailyInsight } from '../insights/entities/daily-insight.entity';
 import { DailyMeme } from '../memes/entities/daily-meme.entity';
 import { User } from '../users/entities/user.entity';
@@ -30,6 +31,7 @@ export function buildTypeOrmOptions(
       UserSelectedCoin,
       DailyInsight,
       DailyMeme,
+      Feedback,
     ],
     migrations: [join(__dirname, 'migrations', '*.{ts,js}')],
     logging:

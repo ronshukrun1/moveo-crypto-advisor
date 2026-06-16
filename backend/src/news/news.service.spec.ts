@@ -365,6 +365,7 @@ describe('NewsService', () => {
       creator: null,
       relatedCoins: ['ETH'],
       publishedAt: '2026-06-15T10:00:00.000Z',
+      feedbackContentId: 'article-2',
     });
     expect(result.items[0]).not.toHaveProperty('image_url');
     expect(result.items[0]).not.toHaveProperty('content');
@@ -597,6 +598,7 @@ describe('news article processing', () => {
       creator: null,
       relatedCoins: ['BTC'],
       publishedAt: '2026-06-15T10:00:00.000Z',
+      feedbackContentId: 'newer',
     });
     expect(processed.items[0]).not.toHaveProperty('relevanceScore');
   });

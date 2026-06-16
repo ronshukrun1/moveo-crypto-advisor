@@ -193,6 +193,7 @@ describe('Market (e2e)', () => {
       priceChange24h: mockMarketItem.price_change_24h,
       changePercentage24h: mockMarketItem.price_change_percentage_24h,
       lastUpdated: mockMarketItem.last_updated,
+      feedbackContentId: 'coin:1',
     });
     expect(body.items[0]).not.toHaveProperty('current_price');
     expect(body.items[0]).not.toHaveProperty('image');

@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class DailyInsightResponseDto {
   @ApiProperty({ example: 'Bitcoin and Ethereum Update' })
@@ -17,4 +17,7 @@ export class DailyInsightResponseDto {
 
   @ApiProperty({ example: '2026-06-16T10:00:00.000Z' })
   generatedAt: string;
+
+  @ApiPropertyOptional({ example: 'daily-insight:123' })
+  feedbackContentId?: string;
 }

@@ -873,3 +873,33 @@ Added `InsightsService.generateFromData()` and `MemesService.generateFromMarketD
 **Automated verification:** frontend build, lint, Vitest — pass.
 
 **Remaining limitations:** no feedback voting, profile/email/password editing, or unsaved-change persistence across refresh.
+
+---
+
+## Stage 24: Feedback voting end-to-end
+
+**Date:** 2026-06-16
+
+**Summary:** Added authenticated thumbs-up/down feedback for all four dashboard sections (Market News, Coin Prices, AI Insight, Crypto Meme). PostgreSQL `feedback` table with unique `(userId, contentType, contentId)` constraint. Backend `PUT` / `GET /api/feedback` with content validation and batch read. Dashboard DTOs expose stable `feedbackContentId` values. Frontend `FeedbackControls` with batch vote loading, accessible MUI icons, save-without-refetch behavior, and Vitest coverage.
+
+**Vote behavior:** repeating the same vote is idempotent; UP ↔ DOWN updates the existing row; re-clicking the selected vote keeps it selected (no DELETE endpoint).
+
+**Content IDs:** `coin:{id}`, news article id, `daily-insight:{id}`, `daily-meme:{id}`.
+
+**Future use (not implemented):** stored feedback could later support content ranking, prompt personalization, relevance scoring, offline evaluation, and supervised preference datasets — model training itself is not implemented in this stage.
+
+**Automated verification:** backend migration show/run/revert/run, build, lint, unit tests, E2E tests; frontend build, lint, test; root build, lint, test — see command output in implementation session.
+
+**Remaining limitations:** no aggregate counts, public statistics, delete endpoint, admin analytics, or automatic personalization changes from votes.
+
+---
+
+## Stage 24.1: News preview-content relevance filter
+
+**Date:** 2026-06-16
+
+**Summary:** Tightened NewsData relevance filtering so at least one selected coin must appear explicitly in the article title or description. Provider `relatedCoins` metadata alone no longer qualifies an article. Bumped in-memory News cache keys to `news:v2:...` so stale pre-filter cache entries are not reused.
+
+**Automated verification:** backend unit/E2E tests with mocked NewsData — pass.
+
+**Remaining limitations:** pages may still return fewer than the requested `limit`; no AI classification; no automatic extra upstream fetches to fill a page.

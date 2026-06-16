@@ -41,6 +41,9 @@ export class MarketItemDto {
 
   @ApiPropertyOptional({ example: '2026-06-15T06:11:30.617Z' })
   lastUpdated: string | null;
+
+  @ApiProperty({ example: 'coin:1' })
+  feedbackContentId: string;
 }
 
 export class MarketListResponseDto {

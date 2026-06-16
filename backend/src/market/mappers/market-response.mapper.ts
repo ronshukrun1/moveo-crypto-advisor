@@ -1,4 +1,5 @@
 import { CoinItemDto } from '../../coins/dto/coin-response.dto';
+import { buildMarketFeedbackContentId } from '../../feedback/utils/feedback-content-id.utils';
 import { MarketItemDto } from '../dto/market-response.dto';
 import { CoinGeckoMarketItem } from '../interfaces/coin-gecko-market-item.interface';
 
@@ -20,5 +21,6 @@ export function toMarketItemDto(
     priceChange24h: marketData.price_change_24h,
     changePercentage24h: marketData.price_change_percentage_24h,
     lastUpdated: marketData.last_updated,
+    feedbackContentId: buildMarketFeedbackContentId(selectedCoin.id),
   };
 }

@@ -12,6 +12,7 @@ import * as authApi from '../api/auth';
 import * as coinsApi from '../api/coins';
 import * as onboardingApi from '../api/onboarding';
 import * as dashboardApi from '../api/dashboard';
+import * as feedbackApi from '../api/feedback';
 import { setStoredToken, clearStoredToken } from '../auth/auth-storage';
 import { ApiError } from '../api/api-error';
 import { mockDashboardResponse } from '../dashboard/dashboard.fixtures';
@@ -20,6 +21,7 @@ vi.mock('../api/auth');
 vi.mock('../api/coins');
 vi.mock('../api/onboarding');
 vi.mock('../api/dashboard');
+vi.mock('../api/feedback');
 
 const incompleteUser = {
   id: 1,
@@ -79,6 +81,13 @@ describe('onboarding flow', () => {
     vi.mocked(authApi.getCurrentUser).mockResolvedValue(incompleteUser);
     vi.mocked(coinsApi.getSupportedCoins).mockResolvedValue(mockCoins);
     vi.mocked(dashboardApi.getDashboard).mockResolvedValue(mockDashboardResponse);
+    vi.mocked(feedbackApi.getFeedback).mockResolvedValue({ items: [] });
+    vi.mocked(feedbackApi.upsertFeedback).mockResolvedValue({
+      contentType: 'INSIGHT',
+      contentId: 'daily-insight:1',
+      feedbackType: 'UP',
+      updatedAt: '2026-06-16T10:00:00.000Z',
+    });
   });
 
   it('loads coins from GET /api/coins', async () => {

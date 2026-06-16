@@ -121,7 +121,7 @@ npm run migration:generate -- src/database/migrations/MigrationName
 
 Migrations are **not** applied automatically at startup (`migrationsRun: false`, `synchronize: false`).
 
-The latest migration adds `daily_insights` and `daily_memes` for per-user UTC-day persistence of AI insight and meme content.
+The latest migration adds the `feedback` table for authenticated UP/DOWN votes on dashboard content (`MARKET`, `NEWS`, `INSIGHT`, `MEME`). Previous migrations include `daily_insights` and `daily_memes` for per-user UTC-day persistence.
 
 ---
 
@@ -227,6 +227,19 @@ After the backend is running with valid provider credentials:
 
 Record only status codes, whether stale fallback was used, dashboard `isStale`, restart behavior, and timing. Do not record secrets or raw provider responses. Restore valid local configuration after testing.
 
+### Manual feedback voting check (optional)
+
+After backend and frontend are running and you have completed onboarding:
+
+1. Log in and open `/dashboard`.
+2. Vote **Helpful** on one coin, one news article, the AI insight, and the meme.
+3. Refresh the page — all four votes should remain selected.
+4. Change one vote from UP to **Not helpful** — confirm only that vote changes (no duplicate rows in `feedback`).
+5. Log in as a second user — votes should be independent.
+6. Confirm voting does not regenerate insight or meme content.
+
+Use neutral feedback wording only. Do not expose JWTs, credentials, or database secrets in screenshots or notes.
+
 ---
 
 ## Common Troubleshooting
@@ -259,7 +272,9 @@ Record only status codes, whether stale fallback was used, dashboard `isStale`, 
 10. `GET /api/news` (optional: `?limit=5`)
 11. `GET /api/insights/daily`
 12. `GET /api/memes/daily`
-13. `GET /api/dashboard`
+13. `GET /api/dashboard` — note `feedbackContentId` on votable items
+14. `PUT /api/feedback` — upsert a vote, e.g. `{ "contentType": "INSIGHT", "contentId": "daily-insight:1", "feedbackType": "UP" }`
+15. `GET /api/feedback?contentIds=…` — batch read votes for dashboard loading
 
 Protected requests:
 

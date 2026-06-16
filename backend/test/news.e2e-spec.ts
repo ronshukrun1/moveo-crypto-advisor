@@ -42,6 +42,29 @@ interface ErrorResponseBody {
   message: string;
 }
 
+function articlePreviewMentionsSelectedCoin(
+  item: NewsItemResponse,
+  selectedNames: string[],
+  selectedSymbols: string[],
+): boolean {
+  const previewText = `${item.title} ${item.description ?? ''}`;
+
+  return (
+    selectedNames.some((name) =>
+      new RegExp(
+        `\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`,
+        'i',
+      ).test(previewText),
+    ) ||
+    selectedSymbols.some((symbol) =>
+      new RegExp(
+        `\\b${symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`,
+        'i',
+      ).test(previewText),
+    )
+  );
+}
+
 const mockArticle = {
   article_id: 'article-1',
   link: 'https://example.com/article-1',
@@ -86,11 +109,21 @@ const mockUnselectedCoinArticle = {
   coin: ['SOL'],
 };
 
+const mockMetadataOnlyBtcArticle = {
+  ...mockArticle,
+  article_id: 'article-metadata-btc',
+  link: 'https://example.com/article-metadata-btc',
+  title: 'Weekly macro outlook',
+  description: 'Global equities and bond markets moved higher.',
+  coin: ['BTC'],
+};
+
 const mockMixedNewsArticles = [
   mockArticle,
   mockRelevantEthArticle,
   mockIrrelevantBtcArticle,
   mockUnselectedCoinArticle,
+  mockMetadataOnlyBtcArticle,
 ];
 
 describe('News (e2e)', () => {
@@ -332,6 +365,44 @@ describe('News (e2e)', () => {
       'article-eth',
       'article-1',
     ]);
+    expect(body.nextPage).toBe('next-token');
+    for (const item of body.items) {
+      expect(
+        articlePreviewMentionsSelectedCoin(
+          item,
+          ['Bitcoin', 'Ethereum'],
+          ['BTC', 'ETH'],
+        ),
+      ).toBe(true);
+    }
+    expect(body.items.some((item) => item.id === 'article-metadata-btc')).toBe(
+      false,
+    );
+  });
+
+  it('excludes articles matched only through provider metadata', async () => {
+    const token = await registerAndLogin();
+
+    await request(app.getHttpServer())
+      .post('/api/onboarding')
+      .set('Authorization', `Bearer ${token}`)
+      .send(onboardingPayload)
+      .expect(200);
+
+    newsDataClient.fetchNews.mockResolvedValue({
+      status: 'success',
+      totalResults: 1,
+      results: [mockMetadataOnlyBtcArticle],
+      nextPage: 'next-token',
+    });
+
+    const response = await request(app.getHttpServer())
+      .get('/api/news?limit=5')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const body = response.body as NewsListResponse;
+    expect(body.items).toHaveLength(0);
     expect(body.nextPage).toBe('next-token');
   });
 

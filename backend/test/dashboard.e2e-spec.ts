@@ -130,11 +130,21 @@ const mockUnselectedCoinArticle = {
   coin: ['SOL'],
 };
 
+const mockMetadataOnlyBtcArticle = {
+  ...mockArticle,
+  article_id: 'article-metadata-btc',
+  link: 'https://example.com/article-metadata-btc',
+  title: 'Weekly macro outlook',
+  description: 'Global equities and bond markets moved higher.',
+  coin: ['BTC'],
+};
+
 const mockMixedNewsArticles = [
   mockArticle,
   mockRelevantEthArticle,
   mockIrrelevantBtcArticle,
   mockUnselectedCoinArticle,
+  mockMetadataOnlyBtcArticle,
 ];
 
 const validModelJson =
@@ -327,6 +337,15 @@ describe('Dashboard (e2e)', () => {
       (body.news.items as Array<{ id: string }>).map((item) => item.id),
     ).toEqual(['article-eth', 'article-1']);
     expect(body.news.nextPage).toBe('next-token');
+    for (const item of body.news.items ?? []) {
+      const previewText = `${item.title as string} ${(item.description as string | null) ?? ''}`;
+      expect(/\b(Bitcoin|Ethereum|BTC|ETH)\b/i.test(previewText)).toBe(true);
+    }
+    expect(
+      (body.news.items as Array<{ id: string }>).some(
+        (item) => item.id === 'article-metadata-btc',
+      ),
+    ).toBe(false);
   });
 
   it('reuses stored insight and meme without calling OpenRouter or Imgflip on a second dashboard request', async () => {
