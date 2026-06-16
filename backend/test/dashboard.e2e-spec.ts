@@ -15,6 +15,7 @@ import { CoinGeckoClient } from '../src/market/coin-gecko.client';
 import { NewsDataClient } from '../src/news/news-data.client';
 import { OpenRouterClient } from '../src/insights/open-router.client';
 import { ImgflipClient } from '../src/memes/imgflip.client';
+import { clearAppCache } from './utils/clear-app-cache';
 import { InvestorProfile } from '../src/preferences/enums/investor-profile.enum';
 
 interface DashboardUserResponse {
@@ -185,6 +186,7 @@ describe('Dashboard (e2e)', () => {
     newsDataClient.fetchNews.mockReset();
     openRouterClient.generateInsightContent.mockReset();
     imgflipClient.captionImage.mockReset();
+    await clearAppCache(app);
 
     await dataSource.query('DELETE FROM daily_insights');
     await dataSource.query('DELETE FROM daily_memes');
@@ -345,6 +347,28 @@ describe('Dashboard (e2e)', () => {
     expect(imgflipClient.captionImage).not.toHaveBeenCalled();
     expect(JSON.stringify(secondBody)).not.toContain('sourceDataSnapshot');
     expect(JSON.stringify(secondBody)).not.toContain('contextHash');
+  });
+
+  it('reuses cached market and news on a second dashboard request', async () => {
+    const token = await registerAndLogin();
+    await onboardUser(token);
+    mockExternalDependencies();
+
+    await request(app.getHttpServer())
+      .get('/api/dashboard')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    coinGeckoClient.fetchMarkets.mockClear();
+    newsDataClient.fetchNews.mockClear();
+
+    await request(app.getHttpServer())
+      .get('/api/dashboard')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(coinGeckoClient.fetchMarkets).not.toHaveBeenCalled();
+    expect(newsDataClient.fetchNews).not.toHaveBeenCalled();
   });
 
   it('calls CoinGecko once when market, insight, and meme are enabled', async () => {
@@ -529,11 +553,7 @@ describe('Dashboard (e2e)', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
 
-    expect(
-      coinGeckoClient.fetchMarkets.mock.calls.length,
-    ).toBeGreaterThanOrEqual(2);
-    expect(newsDataClient.fetchNews.mock.calls.length).toBeGreaterThanOrEqual(
-      1,
-    );
+    expect(coinGeckoClient.fetchMarkets).toHaveBeenCalledTimes(1);
+    expect(newsDataClient.fetchNews).toHaveBeenCalledTimes(1);
   });
 });

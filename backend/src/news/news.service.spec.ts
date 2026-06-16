@@ -4,21 +4,25 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { NewsDataClient } from './news-data.client';
 import { NewsService } from './news.service';
 import { SelectedCoinsService } from '../selected-coins/selected-coins.service';
+import { SafeCacheService } from '../cache/safe-cache.service';
 import {
   deduplicateNewsArticles,
   mapNewsArticles,
   processNewsArticles,
   sortNewsArticlesByPublishedAt,
 } from './utils/news-article-processing';
+import { buildNewsCacheKey } from './utils/news-cache.utils';
 import { toSelectedCoinsForRelevance } from './utils/news-relevance-filter';
 
 describe('NewsService', () => {
   let newsService: NewsService;
   let selectedCoinsService: { getSelectedCoins: jest.Mock };
   let newsDataClient: { fetchNews: jest.Mock };
+  let safeCacheService: { get: jest.Mock; set: jest.Mock };
 
   const userId = 1;
 
@@ -57,6 +61,10 @@ describe('NewsService', () => {
     newsDataClient = {
       fetchNews: jest.fn(),
     };
+    safeCacheService = {
+      get: jest.fn().mockResolvedValue(undefined),
+      set: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -68,6 +76,22 @@ describe('NewsService', () => {
         {
           provide: NewsDataClient,
           useValue: newsDataClient,
+        },
+        {
+          provide: SafeCacheService,
+          useValue: safeCacheService,
+        },
+        {
+          provide: ConfigService,
+          useValue: {
+            getOrThrow: jest.fn((key: string) => {
+              if (key === 'NEWS_CACHE_TTL_SECONDS') {
+                return 300;
+              }
+
+              throw new Error(`Unexpected config key: ${key}`);
+            }),
+          },
         },
       ],
     }).compile();
@@ -82,6 +106,113 @@ describe('NewsService', () => {
 
     expect(result).toEqual({ items: [], nextPage: null });
     expect(newsDataClient.fetchNews).not.toHaveBeenCalled();
+    expect(safeCacheService.get).not.toHaveBeenCalled();
+    expect(safeCacheService.set).not.toHaveBeenCalled();
+  });
+
+  it('returns cached news without calling NewsData on a cache hit', async () => {
+    selectedCoinsService.getSelectedCoins.mockResolvedValue({
+      items: [
+        { id: 1, coingeckoId: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
+      ],
+    });
+    safeCacheService.get.mockResolvedValue({
+      items: [
+        {
+          id: 'article-1',
+          title: 'Bitcoin market update',
+          description: 'Short description',
+          url: 'https://example.com/article-1',
+          imageUrl: 'https://example.com/image.jpg',
+          sourceName: 'Source Name',
+          sourceUrl: 'https://example.com',
+          creator: ['Author Name'],
+          relatedCoins: ['BTC'],
+          publishedAt: '2026-06-14T19:30:38.000Z',
+        },
+      ],
+      nextPage: 'next-token',
+    });
+
+    const result = await newsService.getNews(userId, { limit: 5 });
+
+    expect(result.nextPage).toBe('next-token');
+    expect(newsDataClient.fetchNews).not.toHaveBeenCalled();
+    expect(safeCacheService.set).not.toHaveBeenCalled();
+  });
+
+  it('stores the final filtered response on a cache miss', async () => {
+    selectedCoinsService.getSelectedCoins.mockResolvedValue({
+      items: [
+        { id: 1, coingeckoId: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
+      ],
+    });
+    newsDataClient.fetchNews.mockResolvedValue({
+      status: 'success',
+      totalResults: 1,
+      results: [articleOne],
+      nextPage: 'next-token',
+    });
+
+    await newsService.getNews(userId, { limit: 5 });
+
+    expect(safeCacheService.set).toHaveBeenCalledWith(
+      buildNewsCacheKey(['BTC'], 5),
+      expect.objectContaining({
+        nextPage: 'next-token',
+        items: expect.arrayContaining([
+          expect.objectContaining({ id: 'article-1' }),
+        ]) as unknown,
+      }),
+      300,
+    );
+  });
+
+  it('uses different cache keys for different limits and pages', async () => {
+    selectedCoinsService.getSelectedCoins.mockResolvedValue({
+      items: [
+        { id: 1, coingeckoId: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
+      ],
+    });
+    newsDataClient.fetchNews.mockResolvedValue({
+      status: 'success',
+      totalResults: 1,
+      results: [articleOne],
+      nextPage: null,
+    });
+
+    await newsService.getNews(userId, { limit: 5 });
+    await newsService.getNews(userId, { limit: 10 });
+    await newsService.getNews(userId, { limit: 5, page: 'page-token' });
+
+    expect(safeCacheService.get).toHaveBeenNthCalledWith(
+      1,
+      buildNewsCacheKey(['BTC'], 5),
+    );
+    expect(safeCacheService.get).toHaveBeenNthCalledWith(
+      2,
+      buildNewsCacheKey(['BTC'], 10),
+    );
+    expect(safeCacheService.get).toHaveBeenNthCalledWith(
+      3,
+      buildNewsCacheKey(['BTC'], 5, 'page-token'),
+    );
+  });
+
+  it('does not cache provider errors', async () => {
+    selectedCoinsService.getSelectedCoins.mockResolvedValue({
+      items: [
+        { id: 1, coingeckoId: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
+      ],
+    });
+    newsDataClient.fetchNews.mockRejectedValue(
+      new GatewayTimeoutException('News request timed out'),
+    );
+
+    await expect(newsService.getNews(userId, {})).rejects.toBeInstanceOf(
+      GatewayTimeoutException,
+    );
+    expect(safeCacheService.set).not.toHaveBeenCalled();
   });
 
   it('forwards selected symbols, limit, and pagination token', async () => {

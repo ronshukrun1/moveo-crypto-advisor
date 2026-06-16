@@ -29,6 +29,8 @@ const defaultTestEnvironment = {
   IMGFLIP_PASSWORD: 'test-imgflip-password',
   IMGFLIP_TEMPLATE_ID: '181913649',
   IMGFLIP_TIMEOUT_MS: '5000',
+  MARKET_CACHE_TTL_SECONDS: '120',
+  NEWS_CACHE_TTL_SECONDS: '300',
 };
 
 for (const [key, value] of Object.entries(defaultTestEnvironment)) {

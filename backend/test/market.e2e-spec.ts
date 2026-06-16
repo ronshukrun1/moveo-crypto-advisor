@@ -12,6 +12,7 @@ import { AppModule } from '../src/app.module';
 import { configureApplication } from '../src/app.setup';
 import { InvestorProfile } from '../src/preferences/enums/investor-profile.enum';
 import { CoinGeckoClient } from '../src/market/coin-gecko.client';
+import { clearAppCache } from './utils/clear-app-cache';
 
 interface MarketItemResponse {
   id: string;
@@ -99,6 +100,7 @@ describe('Market (e2e)', () => {
 
   beforeEach(async () => {
     coinGeckoClient.fetchMarkets.mockReset();
+    await clearAppCache(app);
     await dataSource.query('DELETE FROM user_selected_coins');
     await dataSource.query('DELETE FROM user_preferences');
     await dataSource.query('DELETE FROM users');
@@ -193,6 +195,74 @@ describe('Market (e2e)', () => {
     });
     expect(body.items[0]).not.toHaveProperty('current_price');
     expect(body.items[0]).not.toHaveProperty('image');
+  });
+
+  it('reuses cached market data on a second identical request', async () => {
+    const token = await registerAndLogin();
+
+    await request(app.getHttpServer())
+      .post('/api/onboarding')
+      .set('Authorization', `Bearer ${token}`)
+      .send(onboardingPayload)
+      .expect(200);
+
+    coinGeckoClient.fetchMarkets.mockResolvedValue([
+      mockMarketItem,
+      {
+        ...mockMarketItem,
+        id: 'ethereum',
+        symbol: 'eth',
+        name: 'Ethereum',
+        market_cap_rank: 2,
+      },
+    ]);
+
+    const firstResponse = await request(app.getHttpServer())
+      .get('/api/market')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    coinGeckoClient.fetchMarkets.mockClear();
+
+    const secondResponse = await request(app.getHttpServer())
+      .get('/api/market')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(secondResponse.body).toEqual(firstResponse.body);
+    expect(coinGeckoClient.fetchMarkets).not.toHaveBeenCalled();
+    expect(JSON.stringify(secondResponse.body)).not.toContain('cache');
+  });
+
+  it('calls CoinGecko again when selected coins change', async () => {
+    const token = await registerAndLogin();
+
+    await request(app.getHttpServer())
+      .post('/api/onboarding')
+      .set('Authorization', `Bearer ${token}`)
+      .send(onboardingPayload)
+      .expect(200);
+
+    coinGeckoClient.fetchMarkets.mockResolvedValue([mockMarketItem]);
+
+    await request(app.getHttpServer())
+      .get('/api/market')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .put('/api/selected-coins')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ coinIds: [1] })
+      .expect(200);
+
+    coinGeckoClient.fetchMarkets.mockClear();
+    await request(app.getHttpServer())
+      .get('/api/market')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(coinGeckoClient.fetchMarkets).toHaveBeenCalledTimes(1);
+    expect(coinGeckoClient.fetchMarkets).toHaveBeenCalledWith(['bitcoin']);
   });
 
   it('does not expose raw CoinGecko fields or API keys in responses', async () => {

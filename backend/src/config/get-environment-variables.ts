@@ -41,5 +41,11 @@ export function getEnvironmentVariables(
       'IMGFLIP_TEMPLATE_ID',
     ),
     IMGFLIP_TIMEOUT_MS: configService.getOrThrow<number>('IMGFLIP_TIMEOUT_MS'),
+    MARKET_CACHE_TTL_SECONDS: configService.getOrThrow<number>(
+      'MARKET_CACHE_TTL_SECONDS',
+    ),
+    NEWS_CACHE_TTL_SECONDS: configService.getOrThrow<number>(
+      'NEWS_CACHE_TTL_SECONDS',
+    ),
   };
 }

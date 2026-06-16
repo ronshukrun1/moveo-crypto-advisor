@@ -51,6 +51,7 @@ Replace placeholder values in `.env.docker` and `backend/.env`. **Never commit**
 | NewsData | `NEWSDATA_BASE_URL`, `NEWSDATA_API_KEY`, `NEWSDATA_TIMEOUT_MS` |
 | OpenRouter | `OPENROUTER_BASE_URL`, `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_TIMEOUT_MS` |
 | Imgflip | `IMGFLIP_BASE_URL`, `IMGFLIP_USERNAME`, `IMGFLIP_PASSWORD`, `IMGFLIP_TEMPLATE_ID`, `IMGFLIP_TIMEOUT_MS` |
+| Cache | `MARKET_CACHE_TTL_SECONDS`, `NEWS_CACHE_TTL_SECONDS` |
 
 ### Port alignment
 

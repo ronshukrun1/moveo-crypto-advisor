@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AppCacheModule } from './cache/cache.module';
 import { getEnvironmentVariables } from './config/get-environment-variables';
 import { validateEnvironment } from './config/validate-environment';
 import { buildTypeOrmOptions } from './database/typeorm.config';
@@ -28,6 +29,7 @@ import { UsersModule } from './users/users.module';
       useFactory: (configService: ConfigService) =>
         buildTypeOrmOptions(getEnvironmentVariables(configService)),
     }),
+    AppCacheModule,
     HealthModule,
     UsersModule,
     AuthModule,

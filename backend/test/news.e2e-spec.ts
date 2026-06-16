@@ -12,6 +12,7 @@ import { AppModule } from '../src/app.module';
 import { configureApplication } from '../src/app.setup';
 import { InvestorProfile } from '../src/preferences/enums/investor-profile.enum';
 import { NewsDataClient } from '../src/news/news-data.client';
+import { clearAppCache } from './utils/clear-app-cache';
 
 interface NewsItemResponse {
   id: string;
@@ -132,6 +133,7 @@ describe('News (e2e)', () => {
 
   beforeEach(async () => {
     newsDataClient.fetchNews.mockReset();
+    await clearAppCache(app);
     await dataSource.query('DELETE FROM user_selected_coins');
     await dataSource.query('DELETE FROM user_preferences');
     await dataSource.query('DELETE FROM users');
@@ -209,6 +211,97 @@ describe('News (e2e)', () => {
     expect(body.items).toHaveLength(1);
     expect(body.items[0].imageUrl).toBe(mockArticle.image_url);
     expect(body.nextPage).toBe('next-token');
+  });
+
+  it('reuses cached news on a second identical request', async () => {
+    const token = await registerAndLogin();
+
+    await request(app.getHttpServer())
+      .post('/api/onboarding')
+      .set('Authorization', `Bearer ${token}`)
+      .send(onboardingPayload)
+      .expect(200);
+
+    newsDataClient.fetchNews.mockResolvedValue({
+      status: 'success',
+      totalResults: 1,
+      results: [mockArticle],
+      nextPage: 'next-token',
+    });
+
+    const firstResponse = await request(app.getHttpServer())
+      .get('/api/news?limit=5')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    newsDataClient.fetchNews.mockClear();
+
+    const secondResponse = await request(app.getHttpServer())
+      .get('/api/news?limit=5')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(secondResponse.body).toEqual(firstResponse.body);
+    expect(newsDataClient.fetchNews).not.toHaveBeenCalled();
+  });
+
+  it('calls NewsData again when limit changes', async () => {
+    const token = await registerAndLogin();
+
+    await request(app.getHttpServer())
+      .post('/api/onboarding')
+      .set('Authorization', `Bearer ${token}`)
+      .send(onboardingPayload)
+      .expect(200);
+
+    newsDataClient.fetchNews.mockResolvedValue({
+      status: 'success',
+      totalResults: 1,
+      results: [mockArticle],
+      nextPage: null,
+    });
+
+    await request(app.getHttpServer())
+      .get('/api/news?limit=5')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    newsDataClient.fetchNews.mockClear();
+    await request(app.getHttpServer())
+      .get('/api/news?limit=3')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(newsDataClient.fetchNews).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls NewsData again when page changes', async () => {
+    const token = await registerAndLogin();
+
+    await request(app.getHttpServer())
+      .post('/api/onboarding')
+      .set('Authorization', `Bearer ${token}`)
+      .send(onboardingPayload)
+      .expect(200);
+
+    newsDataClient.fetchNews.mockResolvedValue({
+      status: 'success',
+      totalResults: 1,
+      results: [mockArticle],
+      nextPage: 'next-token',
+    });
+
+    await request(app.getHttpServer())
+      .get('/api/news?limit=5')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    newsDataClient.fetchNews.mockClear();
+    await request(app.getHttpServer())
+      .get('/api/news?limit=5&page=page-token')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(newsDataClient.fetchNews).toHaveBeenCalledTimes(1);
   });
 
   it('excludes irrelevant and unselected-coin articles while preserving nextPage', async () => {

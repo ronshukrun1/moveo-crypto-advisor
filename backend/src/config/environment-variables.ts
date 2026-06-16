@@ -118,4 +118,14 @@ export class EnvironmentVariables {
   @IsInt()
   @Min(1)
   IMGFLIP_TIMEOUT_MS: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  MARKET_CACHE_TTL_SECONDS: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  NEWS_CACHE_TTL_SECONDS: number;
 }

@@ -177,7 +177,16 @@ Existing migrations:
 - `generatedAt` in API responses comes from the stored row timestamp (`updatedAt`).
 - Concurrent requests use PostgreSQL unique constraints plus upsert so at most one row exists per user per UTC day; generation happens outside the database transaction, then a short atomic upsert persists the result.
 
-Market and news still lack cross-request cache.
+### In-memory Market and News cache
+
+Mapped market and news responses are cached in-process via `@nestjs/cache-manager` (default TTLs: market **120s**, news **300s** from `MARKET_CACHE_TTL_SECONDS` and `NEWS_CACHE_TTL_SECONDS`).
+
+| Cache | Key basis |
+|-------|-----------|
+| Market | Sorted CoinGecko IDs, fixed `usd` currency — e.g. `market:usd:bitcoin,ethereum` |
+| News | Sorted symbols, `limit`, and page token — e.g. `news:BTC,ETH:limit=5:page=first` |
+
+Keys are **not** user-specific; the same selected coin set shares cache entries. Provider failures are not cached. Cache read/write failures log a warning and fall back to normal provider calls. The cache is local to one backend process and clears on restart; Redis may be added later for multi-instance deployment.
 
 ---
 
@@ -245,9 +254,9 @@ See [../RUN.md](../RUN.md) for full quality commands.
 
 ## Current Limitations
 
-- No cross-request cache or Redis for market or news.
+- Market and news cache is in-process only (not Redis); cache clears on process restart.
 - Insight and meme are persisted per user per UTC day; changing investor profile or selected coins invalidates today's stored content.
-- Market and news are always fetched live when required.
+- Market and news still call external providers on cache miss.
 - News pages may return fewer than the requested `limit` after relevance filtering; no automatic extra NewsData fetches are made to fill a page.
 - Dashboard latency is dominated by OpenRouter (and Imgflip when enabled).
 - Free-tier external API rate limits may affect manual testing.

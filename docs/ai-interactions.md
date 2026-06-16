@@ -756,5 +756,19 @@ Added `InsightsService.generateFromData()` and `MemesService.generateFromMarketD
 
 **Manual verification:** repeated calls returned identical `generatedAt` (insight ~9.6s → ~0.01s; meme ~1.3s → ~0.006s; dashboard ~0.56s → ~0.19s); selected-coin change regenerated insight (~9.8s); one row per user/date in each table.
 
-**Remaining limitations:** market and news still fetched live; no user timezone preferences yet.
+**Remaining limitations:** market and news still fetched live on cache miss; no user timezone preferences yet.
+
+---
+
+## Stage 17: Market and News in-memory cache
+
+**Date:** 2026-06-16
+
+**Summary:** Added in-process caching for mapped `MarketService` and `NewsService` responses using `@nestjs/cache-manager`. Keys are based on selected coin sets (not user IDs); news keys also include `limit` and `page`. Default TTLs: market 120s, news 300s. Cache failures fall back to provider calls.
+
+**Automated verification:** backend build/lint/unit/E2E/audit and root build/lint/test — pass.
+
+**Manual verification:** `/api/market` ~0.45s → ~0.006s; `/api/news?limit=5` ~0.86s → ~0.005s; `/api/dashboard` ~0.023s → ~0.01s; response shapes unchanged; daily insight/meme persistence unchanged.
+
+**Remaining limitations:** cache is per-process only; no Redis; no manual invalidation endpoints.
 
