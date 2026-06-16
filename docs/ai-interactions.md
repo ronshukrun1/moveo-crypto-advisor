@@ -786,3 +786,19 @@ Added `InsightsService.generateFromData()` and `MemesService.generateFromMarketD
 
 **Remaining limitations:** stale data is in-memory only; cleared on restart; no Redis or DB persistence for market/news fallback.
 
+---
+
+## Stage 19: Frontend foundation and design system
+
+**Date:** 2026-06-16
+
+**Summary:** Replaced the Vite starter with a React + MUI foundation: dark theme (`#080B10` / turquoise `#43D6C8`), shared layout and UI components, React Router placeholders, auth context with `localStorage` token storage, Axios client with `401` handling, environment validation, error boundary, and a one-shot `GET /health` connectivity indicator on the landing page footer.
+
+**Routes:** `/`, `/login`, `/register`, `/onboarding`, `/dashboard`, `/preferences`, `/forbidden`, `*` — protected routes redirect to `/login`.
+
+**Out of scope this stage:** full auth flows, onboarding/dashboard/preferences API integration, user profile loading.
+
+**Automated verification:** frontend `npm install`, `build`, `lint`; root `build`, `lint`, `test` (192 backend unit tests) — pass. Backend `GET /api/health` returns `200` with `status: ok`.
+
+**Remaining limitations:** placeholder screens only; no feature API calls except health check; no frontend test framework added.
+

@@ -72,8 +72,13 @@ npm install
 
 ```bash
 cd frontend
+cp .env.example .env
 npm install
 ```
+
+| Variable | Purpose |
+|----------|---------|
+| `VITE_API_BASE_URL` | NestJS API base URL (must include `/api`, e.g. `http://localhost:3000/api`) |
 
 ### Root (orchestration scripts)
 
@@ -152,6 +157,8 @@ npm run dev
 
 Default Vite URL: http://localhost:5173 (must match `FRONTEND_URL` in `backend/.env` for CORS).
 
+Copy `frontend/.env.example` to `frontend/.env` before starting. If `VITE_API_BASE_URL` is missing or wrong, the app fails at startup or the API status indicator shows **unavailable**.
+
 ### Start both from root
 
 ```bash
@@ -227,7 +234,9 @@ Record only status codes, whether stale fallback was used, dashboard `isStale`, 
 | E2E tests fail | Migrations not applied or Docker down | `npm run migration:run`; `docker compose up -d` |
 | `409` on `/api/dashboard` | Onboarding not completed | `POST /api/onboarding` first |
 | `502` / `503` / `504` on content routes | External API key, rate limit, or timeout | Verify provider credentials in `backend/.env` |
-| CORS errors from browser | `FRONTEND_URL` mismatch | Set `FRONTEND_URL` to the actual frontend origin |
+| CORS errors from browser | `FRONTEND_URL` mismatch | Set `FRONTEND_URL` to the actual frontend origin (e.g. `http://localhost:5173`) |
+| Frontend API status unavailable | Wrong `VITE_API_BASE_URL` | Use `http://localhost:3000/api` (include `/api` prefix); ensure backend is running |
+| Frontend fails at startup | Missing `VITE_API_BASE_URL` | Copy `frontend/.env.example` to `frontend/.env` |
 
 ---
 
