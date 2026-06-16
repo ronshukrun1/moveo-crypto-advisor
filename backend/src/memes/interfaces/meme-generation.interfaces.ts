@@ -1,5 +1,5 @@
 export interface MemeGenerationInput {
-  selectedCoins: Array<{ symbol: string; name: string }>;
+  selectedCoins: Array<{ id: number; symbol: string; name: string }>;
   marketItems: Array<{
     symbol: string;
     name: string;

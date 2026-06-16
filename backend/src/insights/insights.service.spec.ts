@@ -5,13 +5,20 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { InvestorProfile } from '../preferences/enums/investor-profile.enum';
 import { PreferencesService } from '../preferences/preferences.service';
 import { SelectedCoinsService } from '../selected-coins/selected-coins.service';
 import { MarketService } from '../market/market.service';
 import { NewsService } from '../news/news.service';
+import {
+  buildInsightContextHash,
+  getUtcDateString,
+} from '../common/utils/daily-content.utils';
+import * as dailyContentUtils from '../common/utils/daily-content.utils';
 import { INSIGHT_DISCLAIMER } from './constants/insight.constants';
 import { InsightsService } from './insights.service';
+import { DailyInsight } from './entities/daily-insight.entity';
 import { OpenRouterClient } from './open-router.client';
 import {
   buildInsightUserPrompt,
@@ -30,11 +37,38 @@ describe('InsightsService', () => {
   let marketService: { getMarketData: jest.Mock };
   let newsService: { getNews: jest.Mock };
   let openRouterClient: { generateInsightContent: jest.Mock };
+  let dailyInsightRepository: {
+    findOne: jest.Mock;
+    findOneOrFail: jest.Mock;
+    upsert: jest.Mock;
+  };
 
   const userId = 1;
+  const storedTimestamp = new Date('2026-06-16T10:00:00.000Z');
 
   const validModelJson =
     '{"title":"Bitcoin and Ethereum Update","insight":"Bitcoin rose 2.2% during the last 24 hours. Ethereum also moved higher while recent headlines reflected ongoing network and market activity."}';
+
+  function buildStoredInsight(contextHash: string) {
+    return {
+      userId,
+      generatedForDate: getUtcDateString(storedTimestamp),
+      title: 'Bitcoin and Ethereum Update',
+      content:
+        'Bitcoin rose 2.2% during the last 24 hours. Ethereum also moved higher while recent headlines reflected ongoing network and market activity.',
+      contextHash,
+      sourceDataSnapshot: {
+        investorProfile: InvestorProfile.LONG_TERM_HOLDER,
+        selectedCoins: [
+          { id: 1, symbol: 'BTC', name: 'Bitcoin' },
+          { id: 2, symbol: 'ETH', name: 'Ethereum' },
+        ],
+        marketFacts: [],
+        newsFacts: [],
+      },
+      updatedAt: storedTimestamp,
+    };
+  }
 
   beforeEach(async () => {
     preferencesService = { getPreferences: jest.fn() };
@@ -42,6 +76,11 @@ describe('InsightsService', () => {
     marketService = { getMarketData: jest.fn() };
     newsService = { getNews: jest.fn() };
     openRouterClient = { generateInsightContent: jest.fn() };
+    dailyInsightRepository = {
+      findOne: jest.fn().mockResolvedValue(null),
+      findOneOrFail: jest.fn(),
+      upsert: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -51,6 +90,10 @@ describe('InsightsService', () => {
         { provide: MarketService, useValue: marketService },
         { provide: NewsService, useValue: newsService },
         { provide: OpenRouterClient, useValue: openRouterClient },
+        {
+          provide: getRepositoryToken(DailyInsight),
+          useValue: dailyInsightRepository,
+        },
       ],
     }).compile();
 
@@ -91,6 +134,12 @@ describe('InsightsService', () => {
       nextPage: null,
     });
     openRouterClient.generateInsightContent.mockResolvedValue(validModelJson);
+    dailyInsightRepository.findOne.mockResolvedValue(null);
+    dailyInsightRepository.findOneOrFail.mockResolvedValue(
+      buildStoredInsight(
+        buildInsightContextHash(InvestorProfile.LONG_TERM_HOLDER, [1, 2]),
+      ),
+    );
   }
 
   it('returns 400 without calling OpenRouter when no coins are selected', async () => {
@@ -139,9 +188,126 @@ describe('InsightsService', () => {
     const result = await insightsService.getDailyInsight(userId);
 
     expect(result.disclaimer).toBe(INSIGHT_DISCLAIMER);
-    expect(result.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(result.generatedAt).toBe(storedTimestamp.toISOString());
     expect(result.title).toBe('Bitcoin and Ethereum Update');
     expect(result.insight).toContain('Bitcoin rose 2.2%');
+    expect(dailyInsightRepository.upsert).toHaveBeenCalled();
+  });
+
+  it('generates new content when the UTC date changes', async () => {
+    mockHappyPathDependencies();
+    const dateSpy = jest
+      .spyOn(dailyContentUtils, 'getUtcDateString')
+      .mockReturnValueOnce('2026-06-16')
+      .mockReturnValueOnce('2026-06-16')
+      .mockReturnValueOnce('2026-06-16')
+      .mockReturnValueOnce('2026-06-16')
+      .mockReturnValue('2026-06-17');
+
+    await insightsService.getDailyInsight(userId);
+    openRouterClient.generateInsightContent.mockClear();
+    dailyInsightRepository.findOne.mockResolvedValue(null);
+    dailyInsightRepository.findOneOrFail.mockResolvedValue(
+      buildStoredInsight(
+        buildInsightContextHash(InvestorProfile.LONG_TERM_HOLDER, [1, 2]),
+      ),
+    );
+
+    await insightsService.getDailyInsight(userId);
+
+    expect(openRouterClient.generateInsightContent).toHaveBeenCalledTimes(1);
+    dateSpy.mockRestore();
+  });
+
+  it('returns stored insight on a second same-day request without calling providers', async () => {
+    preferencesService.getPreferences.mockResolvedValue({
+      investorProfile: InvestorProfile.LONG_TERM_HOLDER,
+    });
+    selectedCoinsService.getSelectedCoins.mockResolvedValue({
+      items: [
+        { id: 1, coingeckoId: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
+        { id: 2, coingeckoId: 'ethereum', symbol: 'ETH', name: 'Ethereum' },
+      ],
+    });
+    const contextHash = buildInsightContextHash(
+      InvestorProfile.LONG_TERM_HOLDER,
+      [1, 2],
+    );
+    dailyInsightRepository.findOne.mockResolvedValue(
+      buildStoredInsight(contextHash),
+    );
+
+    const result = await insightsService.getDailyInsight(userId);
+
+    expect(result.generatedAt).toBe(storedTimestamp.toISOString());
+    expect(marketService.getMarketData).not.toHaveBeenCalled();
+    expect(newsService.getNews).not.toHaveBeenCalled();
+    expect(openRouterClient.generateInsightContent).not.toHaveBeenCalled();
+    expect(dailyInsightRepository.upsert).not.toHaveBeenCalled();
+  });
+
+  it('regenerates when investor profile changes', async () => {
+    mockHappyPathDependencies();
+    preferencesService.getPreferences.mockResolvedValue({
+      investorProfile: InvestorProfile.BEGINNER,
+    });
+
+    await insightsService.getDailyInsight(userId);
+
+    expect(openRouterClient.generateInsightContent).toHaveBeenCalled();
+    expect(dailyInsightRepository.upsert).toHaveBeenCalled();
+  });
+
+  it('regenerates when selected coins change', async () => {
+    mockHappyPathDependencies();
+    selectedCoinsService.getSelectedCoins.mockResolvedValue({
+      items: [{ id: 3, coingeckoId: 'solana', symbol: 'SOL', name: 'Solana' }],
+    });
+
+    await insightsService.getDailyInsight(userId);
+
+    expect(openRouterClient.generateInsightContent).toHaveBeenCalled();
+    expect(dailyInsightRepository.upsert).toHaveBeenCalled();
+  });
+
+  it('stores a safe snapshot without secrets or raw provider data', async () => {
+    mockHappyPathDependencies();
+
+    await insightsService.getDailyInsight(userId);
+
+    const serialized = JSON.stringify(dailyInsightRepository.upsert.mock.calls);
+
+    expect(serialized).not.toContain('password');
+    expect(serialized).not.toContain('api_key');
+    expect(serialized).not.toContain('Bearer');
+    expect(serialized).not.toContain('reasoning');
+    expect(serialized).not.toContain('email');
+  });
+
+  it('does not expose snapshot or context hash in the public response', async () => {
+    mockHappyPathDependencies();
+
+    const result = await insightsService.getDailyInsight(userId);
+
+    expect(result).not.toHaveProperty('sourceDataSnapshot');
+    expect(result).not.toHaveProperty('contextHash');
+  });
+
+  it('returns the stored row after a concurrent upsert race', async () => {
+    mockHappyPathDependencies();
+    const contextHash = buildInsightContextHash(
+      InvestorProfile.LONG_TERM_HOLDER,
+      [1, 2],
+    );
+    dailyInsightRepository.findOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(buildStoredInsight(contextHash));
+
+    const result = await insightsService.getDailyInsight(userId);
+
+    expect(result.generatedAt).toBe(storedTimestamp.toISOString());
+    expect(dailyInsightRepository.upsert).toHaveBeenCalled();
   });
 
   it('does not return provider reasoning or usage fields', async () => {
@@ -195,7 +361,7 @@ describe('InsightsService', () => {
 
     await insightsService.generateFromData({
       investorProfile: InvestorProfile.LONG_TERM_HOLDER,
-      selectedCoins: [{ symbol: 'BTC', name: 'Bitcoin' }],
+      selectedCoins: [{ id: 1, symbol: 'BTC', name: 'Bitcoin' }],
       marketItems: [
         {
           symbol: 'BTC',
@@ -208,6 +374,7 @@ describe('InsightsService', () => {
       ],
       newsItems: [
         {
+          id: 'article-1',
           title: 'Bitcoin market update',
           description: 'Short description',
         },

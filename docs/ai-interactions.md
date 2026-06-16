@@ -740,5 +740,21 @@ Added `InsightsService.generateFromData()` and `MemesService.generateFromMarketD
 
 **Live smoke test:** `GET /api/news?limit=5` returned **200** in ~0.66s with **3** relevant BTC/ETH articles (fewer than requested limit); loosely tagged irrelevant articles excluded; response shape unchanged (`items`, `nextPage`); `nextPage` present.
 
-**Remaining limitations:** no automatic extra NewsData page fetches to refill filtered pages; no persistence or cache.
+**Remaining limitations:** no automatic extra NewsData page fetches to refill filtered pages; no market or news cross-request cache.
+
+---
+
+## Stage 16: Daily insight and meme persistence
+
+**Date:** 2026-06-16
+
+**Summary:** Added `daily_insights` and `daily_memes` tables with UTC-date keys, context hashes, and JSONB snapshots. Same-day requests reuse stored insight/meme content; OpenRouter and Imgflip are skipped on cache hits. Dashboard checks stored content before loading market/news solely for generation.
+
+**Concurrency:** generate outside DB, then TypeORM upsert on `(userId, generatedForDate)` unique constraints.
+
+**Automated verification:** migration show/run/revert/run, backend build/lint/unit/E2E/audit, root build/lint/test — pass.
+
+**Manual verification:** repeated calls returned identical `generatedAt` (insight ~9.6s → ~0.01s; meme ~1.3s → ~0.006s; dashboard ~0.56s → ~0.19s); selected-coin change regenerated insight (~9.8s); one row per user/date in each table.
+
+**Remaining limitations:** market and news still fetched live; no user timezone preferences yet.
 

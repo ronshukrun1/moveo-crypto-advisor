@@ -151,6 +151,8 @@ Never returned to clients: stack traces, SQL errors, password hashes, API keys, 
 | `coins` | Supported cryptocurrency catalog |
 | `user_preferences` | Investor profile and display toggles |
 | `user_selected_coins` | User-to-coin selections |
+| `daily_insights` | One persisted AI insight per user per UTC day |
+| `daily_memes` | One persisted meme per user per UTC day |
 | `migrations` | TypeORM migration history (internal) |
 
 ### Migrations
@@ -163,6 +165,19 @@ Existing migrations:
 - `CreateCoinsTable`
 - `CreateUserPreferencesTable`
 - `CreateUserSelectedCoinsTable`
+- `CreateDailyContentTables`
+
+### Daily insight and meme persistence
+
+`GET /api/insights/daily`, `GET /api/memes/daily`, and the dashboard insight/meme sections reuse stored content for the same authenticated user and **UTC calendar date**.
+
+- The first request of the day generates content, stores a safe JSONB snapshot and context hash, and returns the public response.
+- Later same-day requests with a matching context hash return the stored row without calling OpenRouter or Imgflip.
+- The context hash includes investor profile and selected coin IDs for insights, and selected coin IDs plus the configured Imgflip template ID for memes. Changing those values invalidates today's stored row and triggers regeneration.
+- `generatedAt` in API responses comes from the stored row timestamp (`updatedAt`).
+- Concurrent requests use PostgreSQL unique constraints plus upsert so at most one row exists per user per UTC day; generation happens outside the database transaction, then a short atomic upsert persists the result.
+
+Market and news still lack cross-request cache.
 
 ---
 
@@ -230,8 +245,8 @@ See [../RUN.md](../RUN.md) for full quality commands.
 
 ## Current Limitations
 
-- No cross-request cache or Redis.
-- Insight and meme regenerate on every `/daily` and dashboard request — no daily persistence tables yet.
+- No cross-request cache or Redis for market or news.
+- Insight and meme are persisted per user per UTC day; changing investor profile or selected coins invalidates today's stored content.
 - Market and news are always fetched live when required.
 - News pages may return fewer than the requested `limit` after relevance filtering; no automatic extra NewsData fetches are made to fill a page.
 - Dashboard latency is dominated by OpenRouter (and Imgflip when enabled).

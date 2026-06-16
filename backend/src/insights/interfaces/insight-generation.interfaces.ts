@@ -2,7 +2,7 @@ import { InvestorProfile } from '../../preferences/enums/investor-profile.enum';
 
 export interface InsightGenerationInput {
   investorProfile: InvestorProfile;
-  selectedCoins: Array<{ symbol: string; name: string }>;
+  selectedCoins: Array<{ id: number; symbol: string; name: string }>;
   marketItems: Array<{
     symbol: string;
     name: string;
@@ -12,6 +12,7 @@ export interface InsightGenerationInput {
     low24h: number | null;
   }>;
   newsItems: Array<{
+    id: string;
     title: string;
     description: string | null;
   }>;

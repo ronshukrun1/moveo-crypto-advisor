@@ -114,6 +114,8 @@ npm run migration:generate -- src/database/migrations/MigrationName
 
 Migrations are **not** applied automatically at startup (`migrationsRun: false`, `synchronize: false`).
 
+The latest migration adds `daily_insights` and `daily_memes` for per-user UTC-day persistence of AI insight and meme content.
+
 ---
 
 ## Start the Backend

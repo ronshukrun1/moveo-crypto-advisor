@@ -12,6 +12,7 @@ import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
 import { configureApplication } from '../src/app.setup';
 import { CoinGeckoClient } from '../src/market/coin-gecko.client';
+import { DailyMeme } from '../src/memes/entities/daily-meme.entity';
 import { ImgflipClient } from '../src/memes/imgflip.client';
 import { InvestorProfile } from '../src/preferences/enums/investor-profile.enum';
 
@@ -93,6 +94,8 @@ describe('Memes (e2e)', () => {
     coinGeckoClient.fetchMarkets.mockReset();
     imgflipClient.captionImage.mockReset();
 
+    await dataSource.query('DELETE FROM daily_insights');
+    await dataSource.query('DELETE FROM daily_memes');
     await dataSource.query('DELETE FROM user_selected_coins');
     await dataSource.query('DELETE FROM user_preferences');
     await dataSource.query('DELETE FROM users');
@@ -185,6 +188,30 @@ describe('Memes (e2e)', () => {
     expect(imgflipClient.captionImage).toHaveBeenCalled();
   });
 
+  it('returns the same stored meme on a second same-day request', async () => {
+    const token = await registerAndLogin();
+    await onboardUser(token);
+    mockExternalDependencies();
+
+    const firstResponse = await request(app.getHttpServer())
+      .get('/api/memes/daily')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    imgflipClient.captionImage.mockClear();
+    coinGeckoClient.fetchMarkets.mockClear();
+
+    const secondResponse = await request(app.getHttpServer())
+      .get('/api/memes/daily')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(secondResponse.body).toEqual(firstResponse.body);
+    expect(imgflipClient.captionImage).not.toHaveBeenCalled();
+    expect(coinGeckoClient.fetchMarkets).not.toHaveBeenCalled();
+
+    expect(await dataSource.getRepository(DailyMeme).count()).toBe(1);
+  });
+
   it('does not expose credentials or raw Imgflip fields', async () => {
     const token = await registerAndLogin();
     await onboardUser(token);
@@ -201,6 +228,8 @@ describe('Memes (e2e)', () => {
     expect(serialized).not.toContain('success');
     expect(serialized).not.toContain('error_message');
     expect(serialized).not.toContain('test-imgflip-password');
+    expect(serialized).not.toContain('sourceDataSnapshot');
+    expect(serialized).not.toContain('contextHash');
   });
 
   it('rejects unknown query fields such as userId', async () => {

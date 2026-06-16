@@ -1,6 +1,8 @@
 import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import { DailyInsightResponseDto } from '../insights/dto/daily-insight-response.dto';
 import { InsightsService } from '../insights/insights.service';
 import { MarketService } from '../market/market.service';
+import { DailyMemeResponseDto } from '../memes/dto/daily-meme-response.dto';
 import { MemesService } from '../memes/memes.service';
 import { NewsService } from '../news/news.service';
 import { PreferencesService } from '../preferences/preferences.service';
@@ -49,11 +51,21 @@ export class DashboardService {
     const { items: selectedCoins } =
       await this.selectedCoinsService.getSelectedCoins(userId);
 
+    const [storedInsight, storedMeme] = await Promise.all([
+      preferences.showAiInsight
+        ? this.insightsService.tryGetValidStoredDailyInsight(userId)
+        : Promise.resolve(null),
+      preferences.showMeme
+        ? this.memesService.tryGetValidStoredDailyMeme(userId)
+        : Promise.resolve(null),
+    ]);
+
     const marketRequired =
       preferences.showMarketPrices ||
-      preferences.showAiInsight ||
-      preferences.showMeme;
-    const newsRequired = preferences.showNews || preferences.showAiInsight;
+      (preferences.showAiInsight && !storedInsight) ||
+      (preferences.showMeme && !storedMeme);
+    const newsRequired =
+      preferences.showNews || (preferences.showAiInsight && !storedInsight);
 
     const [sharedMarket, sharedNews] = await Promise.all([
       marketRequired
@@ -75,8 +87,16 @@ export class DashboardService {
         selectedCoins,
         sharedMarket,
         sharedNews,
+        storedInsight,
+        userId,
       ),
-      this.buildMemeSection(preferences.showMeme, selectedCoins, sharedMarket),
+      this.buildMemeSection(
+        preferences.showMeme,
+        selectedCoins,
+        sharedMarket,
+        storedMeme,
+        userId,
+      ),
     ]);
 
     return {
@@ -175,9 +195,15 @@ export class DashboardService {
     selectedCoins: DashboardResponseDto['selectedCoins'],
     sharedMarket: SharedMarketDataResult | null,
     sharedNews: SharedNewsDataResult | null,
+    storedInsight: DailyInsightResponseDto | null,
+    userId: number,
   ): Promise<DashboardInsightSectionDto> {
     if (!isEnabled) {
       return { status: 'disabled' };
+    }
+
+    if (storedInsight) {
+      return { status: 'available', data: storedInsight };
     }
 
     if (
@@ -199,12 +225,15 @@ export class DashboardService {
     }
 
     try {
-      const data = await this.insightsService.generateFromData({
-        investorProfile,
-        selectedCoins,
-        marketItems: sharedMarket.items,
-        newsItems: sharedNews.items,
-      });
+      const data = await this.insightsService.generateAndPersistFromData(
+        userId,
+        {
+          investorProfile,
+          selectedCoins,
+          marketItems: sharedMarket.items,
+          newsItems: sharedNews.items,
+        },
+      );
       return { status: 'available', data };
     } catch (error) {
       this.logSectionFailure('insight', error);
@@ -219,9 +248,15 @@ export class DashboardService {
     isEnabled: boolean,
     selectedCoins: DashboardResponseDto['selectedCoins'],
     sharedMarket: SharedMarketDataResult | null,
+    storedMeme: DailyMemeResponseDto | null,
+    userId: number,
   ): Promise<DashboardMemeSectionDto> {
     if (!isEnabled) {
       return { status: 'disabled' };
+    }
+
+    if (storedMeme) {
+      return { status: 'available', data: storedMeme };
     }
 
     if (
@@ -236,10 +271,13 @@ export class DashboardService {
     }
 
     try {
-      const data = await this.memesService.generateFromMarketData({
-        selectedCoins,
-        marketItems: sharedMarket.items,
-      });
+      const data = await this.memesService.generateAndPersistFromMarketData(
+        userId,
+        {
+          selectedCoins,
+          marketItems: sharedMarket.items,
+        },
+      );
       return { status: 'available', data };
     } catch (error) {
       this.logSectionFailure('meme', error);

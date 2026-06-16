@@ -13,6 +13,7 @@ import { AppModule } from '../src/app.module';
 import { configureApplication } from '../src/app.setup';
 import { CoinGeckoClient } from '../src/market/coin-gecko.client';
 import { NewsDataClient } from '../src/news/news-data.client';
+import { DailyInsight } from '../src/insights/entities/daily-insight.entity';
 import { OpenRouterClient } from '../src/insights/open-router.client';
 import { InvestorProfile } from '../src/preferences/enums/investor-profile.enum';
 import { INSIGHT_DISCLAIMER } from '../src/insights/constants/insight.constants';
@@ -118,6 +119,8 @@ describe('Insights (e2e)', () => {
     newsDataClient.fetchNews.mockReset();
     openRouterClient.generateInsightContent.mockReset();
 
+    await dataSource.query('DELETE FROM daily_insights');
+    await dataSource.query('DELETE FROM daily_memes');
     await dataSource.query('DELETE FROM user_selected_coins');
     await dataSource.query('DELETE FROM user_preferences');
     await dataSource.query('DELETE FROM users');
@@ -209,6 +212,81 @@ describe('Insights (e2e)', () => {
     expect(body.disclaimer).toBe(INSIGHT_DISCLAIMER);
     expect(body.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(openRouterClient.generateInsightContent).toHaveBeenCalled();
+  });
+
+  it('returns the same stored insight on a second same-day request', async () => {
+    const token = await registerAndLogin();
+    await onboardUser(token);
+    mockExternalDependencies();
+
+    const firstResponse = await request(app.getHttpServer())
+      .get('/api/insights/daily')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    openRouterClient.generateInsightContent.mockClear();
+    coinGeckoClient.fetchMarkets.mockClear();
+    newsDataClient.fetchNews.mockClear();
+
+    const secondResponse = await request(app.getHttpServer())
+      .get('/api/insights/daily')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const firstBody = firstResponse.body as DailyInsightResponse;
+    const secondBody = secondResponse.body as DailyInsightResponse;
+    expect(secondBody).toEqual(firstBody);
+    expect(openRouterClient.generateInsightContent).not.toHaveBeenCalled();
+    expect(coinGeckoClient.fetchMarkets).not.toHaveBeenCalled();
+    expect(newsDataClient.fetchNews).not.toHaveBeenCalled();
+
+    expect(await dataSource.getRepository(DailyInsight).count()).toBe(1);
+  });
+
+  it('regenerates insight after selected coins change', async () => {
+    const token = await registerAndLogin();
+    await onboardUser(token);
+    mockExternalDependencies();
+
+    await request(app.getHttpServer())
+      .get('/api/insights/daily')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .put('/api/selected-coins')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ coinIds: [1] })
+      .expect(200);
+
+    openRouterClient.generateInsightContent.mockClear();
+    await request(app.getHttpServer())
+      .get('/api/insights/daily')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(openRouterClient.generateInsightContent).toHaveBeenCalledTimes(1);
+
+    expect(await dataSource.getRepository(DailyInsight).count()).toBe(1);
+  });
+
+  it('does not expose snapshot or context hash fields', async () => {
+    const token = await registerAndLogin();
+    await onboardUser(token);
+    mockExternalDependencies();
+
+    const response = await request(app.getHttpServer())
+      .get('/api/insights/daily')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const serialized = JSON.stringify(response.body);
+    expect(serialized).not.toContain('reasoning');
+    expect(serialized).not.toContain('usage');
+    expect(serialized).not.toContain('provider');
+    expect(serialized).not.toContain('test-openrouter-api-key');
+    expect(serialized).not.toContain('System prompt');
+    expect(serialized).not.toContain('sourceDataSnapshot');
+    expect(serialized).not.toContain('contextHash');
   });
 
   it('does not expose reasoning, usage, provider, or raw prompt data', async () => {

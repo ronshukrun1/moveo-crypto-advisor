@@ -3,6 +3,12 @@ import {
   BadRequestException,
   Injectable,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import {
+  buildInsightContextHash,
+  getUtcDateString,
+} from '../common/utils/daily-content.utils';
 import { PreferencesService } from '../preferences/preferences.service';
 import { SelectedCoinsService } from '../selected-coins/selected-coins.service';
 import { MarketService } from '../market/market.service';
@@ -12,6 +18,7 @@ import {
   INSIGHT_NEWS_LIMIT,
 } from './constants/insight.constants';
 import { DailyInsightResponseDto } from './dto/daily-insight-response.dto';
+import { DailyInsight } from './entities/daily-insight.entity';
 import { InsightGenerationInput } from './interfaces/insight-generation.interfaces';
 import {
   InsightMarketFact,
@@ -19,6 +26,7 @@ import {
   InsightPromptContext,
 } from './interfaces/insight-context.interfaces';
 import { OpenRouterClient } from './open-router.client';
+import { buildInsightSourceSnapshot } from './utils/insight-snapshot.builder';
 import { buildInsightMessages } from './utils/insight-prompt.builder';
 import { parseModelInsightContent } from './utils/insight-output.validation';
 
@@ -30,9 +38,44 @@ export class InsightsService {
     private readonly marketService: MarketService,
     private readonly newsService: NewsService,
     private readonly openRouterClient: OpenRouterClient,
+    @InjectRepository(DailyInsight)
+    private readonly dailyInsightRepository: Repository<DailyInsight>,
   ) {}
 
+  async tryGetValidStoredDailyInsight(
+    userId: number,
+  ): Promise<DailyInsightResponseDto | null> {
+    const preferences = await this.preferencesService.getPreferences(userId);
+    const { items: selectedCoins } =
+      await this.selectedCoinsService.getSelectedCoins(userId);
+
+    if (selectedCoins.length === 0) {
+      return null;
+    }
+
+    const contextHash = buildInsightContextHash(
+      preferences.investorProfile,
+      selectedCoins.map((coin) => coin.id),
+    );
+    const generatedForDate = getUtcDateString();
+    const stored = await this.dailyInsightRepository.findOne({
+      where: { userId, generatedForDate },
+    });
+
+    if (!stored || stored.contextHash !== contextHash) {
+      return null;
+    }
+
+    return this.mapStoredInsightToResponse(stored);
+  }
+
   async getDailyInsight(userId: number): Promise<DailyInsightResponseDto> {
+    const stored = await this.tryGetValidStoredDailyInsight(userId);
+
+    if (stored) {
+      return stored;
+    }
+
     const preferences = await this.preferencesService.getPreferences(userId);
     const { items: selectedCoins } =
       await this.selectedCoinsService.getSelectedCoins(userId);
@@ -54,12 +97,58 @@ export class InsightsService {
       limit: INSIGHT_NEWS_LIMIT,
     });
 
-    return this.generateFromData({
+    return this.generateAndPersistFromData(userId, {
       investorProfile: preferences.investorProfile,
       selectedCoins,
       marketItems,
       newsItems,
     });
+  }
+
+  async generateAndPersistFromData(
+    userId: number,
+    input: InsightGenerationInput,
+  ): Promise<DailyInsightResponseDto> {
+    if (input.selectedCoins.length === 0) {
+      throw new BadRequestException(
+        'Select at least one coin before generating an insight',
+      );
+    }
+
+    if (input.marketItems.length === 0) {
+      throw new BadGatewayException('Unable to generate insight');
+    }
+
+    const contextHash = buildInsightContextHash(
+      input.investorProfile,
+      input.selectedCoins.map((coin) => coin.id),
+    );
+    const generatedForDate = getUtcDateString();
+    const existing = await this.dailyInsightRepository.findOne({
+      where: { userId, generatedForDate },
+    });
+
+    if (existing && existing.contextHash === contextHash) {
+      return this.mapStoredInsightToResponse(existing);
+    }
+
+    const generated = await this.generateFromData(input);
+    const sourceDataSnapshot = buildInsightSourceSnapshot(input);
+
+    await this.persistDailyInsight({
+      userId,
+      generatedForDate,
+      title: generated.title,
+      content: generated.insight,
+      sourceDataSnapshot,
+      contextHash,
+    });
+
+    const saved = await this.dailyInsightRepository.findOneOrFail({
+      where: { userId, generatedForDate },
+    });
+
+    return this.mapStoredInsightToResponse(saved);
   }
 
   async generateFromData(
@@ -93,6 +182,33 @@ export class InsightsService {
       disclaimer: INSIGHT_DISCLAIMER,
       generatedAt: new Date().toISOString(),
     };
+  }
+
+  private mapStoredInsightToResponse(
+    stored: DailyInsight,
+  ): DailyInsightResponseDto {
+    return {
+      title: stored.title,
+      insight: stored.content,
+      disclaimer: INSIGHT_DISCLAIMER,
+      generatedAt: stored.updatedAt.toISOString(),
+    };
+  }
+
+  private async persistDailyInsight(
+    record: Pick<
+      DailyInsight,
+      | 'userId'
+      | 'generatedForDate'
+      | 'title'
+      | 'content'
+      | 'sourceDataSnapshot'
+      | 'contextHash'
+    >,
+  ): Promise<void> {
+    await this.dailyInsightRepository.upsert(record, {
+      conflictPaths: ['userId', 'generatedForDate'],
+    });
   }
 
   private buildPromptContext(

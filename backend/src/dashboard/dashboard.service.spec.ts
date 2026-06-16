@@ -22,8 +22,14 @@ describe('DashboardService', () => {
   let selectedCoinsService: { getSelectedCoins: jest.Mock };
   let marketService: { getMarketData: jest.Mock };
   let newsService: { getNews: jest.Mock };
-  let insightsService: { generateFromData: jest.Mock };
-  let memesService: { generateFromMarketData: jest.Mock };
+  let insightsService: {
+    generateAndPersistFromData: jest.Mock;
+    tryGetValidStoredDailyInsight: jest.Mock;
+  };
+  let memesService: {
+    generateAndPersistFromMarketData: jest.Mock;
+    tryGetValidStoredDailyMeme: jest.Mock;
+  };
 
   const userId = 1;
 
@@ -112,8 +118,14 @@ describe('DashboardService', () => {
     selectedCoinsService = { getSelectedCoins: jest.fn() };
     marketService = { getMarketData: jest.fn() };
     newsService = { getNews: jest.fn() };
-    insightsService = { generateFromData: jest.fn() };
-    memesService = { generateFromMarketData: jest.fn() };
+    insightsService = {
+      generateAndPersistFromData: jest.fn(),
+      tryGetValidStoredDailyInsight: jest.fn(),
+    };
+    memesService = {
+      generateAndPersistFromMarketData: jest.fn(),
+      tryGetValidStoredDailyMeme: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -137,8 +149,10 @@ describe('DashboardService', () => {
     selectedCoinsService.getSelectedCoins.mockResolvedValue(selectedCoins);
     marketService.getMarketData.mockResolvedValue(marketData);
     newsService.getNews.mockResolvedValue(newsData);
-    insightsService.generateFromData.mockResolvedValue(insightData);
-    memesService.generateFromMarketData.mockResolvedValue(memeData);
+    insightsService.tryGetValidStoredDailyInsight.mockResolvedValue(null);
+    memesService.tryGetValidStoredDailyMeme.mockResolvedValue(null);
+    insightsService.generateAndPersistFromData.mockResolvedValue(insightData);
+    memesService.generateAndPersistFromMarketData.mockResolvedValue(memeData);
   }
 
   it('returns 409 when onboarding is incomplete', async () => {
@@ -171,16 +185,22 @@ describe('DashboardService', () => {
     expect(marketService.getMarketData).toHaveBeenCalledTimes(1);
     expect(newsService.getNews).toHaveBeenCalledTimes(1);
     expect(newsService.getNews).toHaveBeenCalledWith(userId, { limit: 5 });
-    expect(insightsService.generateFromData).toHaveBeenCalledWith({
-      investorProfile: InvestorProfile.LONG_TERM_HOLDER,
-      selectedCoins: selectedCoins.items,
-      marketItems: marketData.items,
-      newsItems: newsData.items,
-    });
-    expect(memesService.generateFromMarketData).toHaveBeenCalledWith({
-      selectedCoins: selectedCoins.items,
-      marketItems: marketData.items,
-    });
+    expect(insightsService.generateAndPersistFromData).toHaveBeenCalledWith(
+      userId,
+      {
+        investorProfile: InvestorProfile.LONG_TERM_HOLDER,
+        selectedCoins: selectedCoins.items,
+        marketItems: marketData.items,
+        newsItems: newsData.items,
+      },
+    );
+    expect(memesService.generateAndPersistFromMarketData).toHaveBeenCalledWith(
+      userId,
+      {
+        selectedCoins: selectedCoins.items,
+        marketItems: marketData.items,
+      },
+    );
   });
 
   it('does not load market or news when all dependent sections are disabled', async () => {
@@ -197,8 +217,10 @@ describe('DashboardService', () => {
 
     expect(marketService.getMarketData).not.toHaveBeenCalled();
     expect(newsService.getNews).not.toHaveBeenCalled();
-    expect(insightsService.generateFromData).not.toHaveBeenCalled();
-    expect(memesService.generateFromMarketData).not.toHaveBeenCalled();
+    expect(insightsService.generateAndPersistFromData).not.toHaveBeenCalled();
+    expect(
+      memesService.generateAndPersistFromMarketData,
+    ).not.toHaveBeenCalled();
     expect(result.market).toEqual({ status: 'disabled' });
     expect(result.news).toEqual({ status: 'disabled' });
     expect(result.insight).toEqual({ status: 'disabled' });
@@ -276,8 +298,10 @@ describe('DashboardService', () => {
     expect(result.news.status).toBe('available');
     expect(result.insight.status).toBe('unavailable');
     expect(result.meme.status).toBe('unavailable');
-    expect(insightsService.generateFromData).not.toHaveBeenCalled();
-    expect(memesService.generateFromMarketData).not.toHaveBeenCalled();
+    expect(insightsService.generateAndPersistFromData).not.toHaveBeenCalled();
+    expect(
+      memesService.generateAndPersistFromMarketData,
+    ).not.toHaveBeenCalled();
   });
 
   it('returns unavailable news and insight when shared news fails', async () => {
@@ -294,12 +318,12 @@ describe('DashboardService', () => {
     expect(result.market.status).toBe('available');
     expect(result.insight.status).toBe('unavailable');
     expect(result.meme.status).toBe('available');
-    expect(insightsService.generateFromData).not.toHaveBeenCalled();
+    expect(insightsService.generateAndPersistFromData).not.toHaveBeenCalled();
   });
 
   it('returns unavailable insight only when OpenRouter generation fails', async () => {
     mockBaseDependencies();
-    insightsService.generateFromData.mockRejectedValue(
+    insightsService.generateAndPersistFromData.mockRejectedValue(
       new Error('OpenRouter failed'),
     );
 
@@ -315,7 +339,7 @@ describe('DashboardService', () => {
 
   it('returns unavailable meme only when Imgflip generation fails', async () => {
     mockBaseDependencies();
-    memesService.generateFromMarketData.mockRejectedValue(
+    memesService.generateAndPersistFromMarketData.mockRejectedValue(
       new Error('Imgflip failed'),
     );
 
@@ -327,6 +351,23 @@ describe('DashboardService', () => {
     });
     expect(result.market.status).toBe('available');
     expect(result.insight.status).toBe('available');
+  });
+
+  it('reuses stored insight and meme without calling generation', async () => {
+    mockBaseDependencies();
+    insightsService.tryGetValidStoredDailyInsight.mockResolvedValue(
+      insightData,
+    );
+    memesService.tryGetValidStoredDailyMeme.mockResolvedValue(memeData);
+
+    const result = await dashboardService.getDashboard(userId);
+
+    expect(insightsService.generateAndPersistFromData).not.toHaveBeenCalled();
+    expect(
+      memesService.generateAndPersistFromMarketData,
+    ).not.toHaveBeenCalled();
+    expect(result.insight).toEqual({ status: 'available', data: insightData });
+    expect(result.meme).toEqual({ status: 'available', data: memeData });
   });
 
   it('does not expose sensitive fields in the dashboard response', async () => {

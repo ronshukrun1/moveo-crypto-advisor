@@ -186,6 +186,8 @@ describe('Dashboard (e2e)', () => {
     openRouterClient.generateInsightContent.mockReset();
     imgflipClient.captionImage.mockReset();
 
+    await dataSource.query('DELETE FROM daily_insights');
+    await dataSource.query('DELETE FROM daily_memes');
     await dataSource.query('DELETE FROM user_selected_coins');
     await dataSource.query('DELETE FROM user_preferences');
     await dataSource.query('DELETE FROM users');
@@ -315,6 +317,34 @@ describe('Dashboard (e2e)', () => {
       (body.news.items as Array<{ id: string }>).map((item) => item.id),
     ).toEqual(['article-eth', 'article-1']);
     expect(body.news.nextPage).toBe('next-token');
+  });
+
+  it('reuses stored insight and meme without calling OpenRouter or Imgflip on a second dashboard request', async () => {
+    const token = await registerAndLogin();
+    await onboardUser(token);
+    mockExternalDependencies();
+
+    const firstResponse = await request(app.getHttpServer())
+      .get('/api/dashboard')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    openRouterClient.generateInsightContent.mockClear();
+    imgflipClient.captionImage.mockClear();
+
+    const secondResponse = await request(app.getHttpServer())
+      .get('/api/dashboard')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const firstBody = firstResponse.body as DashboardResponse;
+    const secondBody = secondResponse.body as DashboardResponse;
+    expect(secondBody.insight).toEqual(firstBody.insight);
+    expect(secondBody.meme).toEqual(firstBody.meme);
+    expect(openRouterClient.generateInsightContent).not.toHaveBeenCalled();
+    expect(imgflipClient.captionImage).not.toHaveBeenCalled();
+    expect(JSON.stringify(secondBody)).not.toContain('sourceDataSnapshot');
+    expect(JSON.stringify(secondBody)).not.toContain('contextHash');
   });
 
   it('calls CoinGecko once when market, insight, and meme are enabled', async () => {
