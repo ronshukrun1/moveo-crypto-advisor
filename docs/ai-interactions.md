@@ -611,3 +611,120 @@ Added `MemesModule` with `ImgflipClient`, `MemesService`, and `GET /api/memes/da
 - Endpoint generates a new meme on every call until persistence/cache is implemented
 - E2E requires Docker PostgreSQL with migrations applied
 
+---
+
+## Stage 13: Dashboard Orchestration
+
+**Date:** 2026-06-16
+
+**Prompt summary:**
+
+Implement one authenticated dashboard endpoint that orchestrates user info, preferences, selected coins, market data, news, AI insight, and meme generation with preference-based execution and partial failure support.
+
+**Response summary:**
+
+Added `DashboardModule` with `GET /api/dashboard` (JWT). Verifies user existence and completed onboarding (`409` if incomplete), loads preferences and selected coins, then concurrently loads enabled sections. Each section returns `available`, `unavailable`, or `disabled` without failing the whole dashboard when optional external services fail.
+
+**Main decisions:**
+
+- Reuses existing `UsersService`, `PreferencesService`, `SelectedCoinsService`, `MarketService`, `NewsService`, `InsightsService`, and `MemesService`
+- Enabled sections loaded concurrently via `Promise.all`; failures caught per section with safe messages
+- Disabled preferences skip service calls and return `{ status: "disabled" }`
+- News limited to 5 items on dashboard; no pagination query params (empty `DashboardQueryDto` rejects unknown query fields)
+- User response excludes email and sensitive fields; dashboard-level `generatedAt` added in application
+- Exported `InsightsService` and `MemesService` for cross-module orchestration
+- No cache or persistence — insight and meme regenerate on each enabled dashboard request; repeated market/news calls may occur through insight/meme internal dependencies until later stages
+
+**Files created or modified:**
+
+- Created: `backend/src/dashboard/*`, `backend/test/dashboard.e2e-spec.ts`
+- Modified: `backend/src/app.module.ts`, `backend/src/insights/insights.module.ts`, `backend/src/memes/memes.module.ts`, `docs/ai-interactions.md`
+
+**Dependencies added:**
+
+- None
+
+**Migration required:**
+
+- No
+
+**Commands and tests:**
+
+- `docker compose ps` — Pass (healthy)
+- `migration:show` / `run` — Pass (no pending migrations)
+- `backend`: build, lint, test (129), test:e2e (89), audit — Pass
+- `root`: build, lint, test — Pass
+
+**Manual smoke test:**
+
+- **200** in ~8.0s — all enabled sections `available`; user, preferences, and selected coins correct; no secrets or raw provider fields exposed
+
+**Performance limitation:**
+
+- Total dashboard latency is dominated by live insight generation (~12s previously) plus market, news, and meme calls; no caching yet
+
+**Unresolved issues:**
+
+- Repeated market/news API calls when insight and meme are both enabled
+- Insight and meme regenerate on every dashboard request until persistence/cache is added
+- E2E requires Docker PostgreSQL with migrations applied
+
+---
+
+## Stage 14: Dashboard Data Reuse and Duplicate External Call Reduction
+
+**Date:** 2026-06-16
+
+**Prompt summary:**
+
+Reduce duplicate CoinGecko and NewsData calls within a single `GET /api/dashboard` request by reusing already-loaded market and news data for insight and meme generation.
+
+**Response summary:**
+
+Added `InsightsService.generateFromData()` and `MemesService.generateFromMarketData()` for caller-supplied data. `DashboardService` now loads shared market/news once per request (based on preference dependencies), then passes results to insight/meme generation. Hidden dependencies supported: market or news may load internally while the public section remains `disabled`.
+
+**Reuse strategy:**
+
+- Market required when `showMarketPrices`, `showAiInsight`, or `showMeme` is enabled
+- News required when `showNews` or `showAiInsight` is enabled
+- Shared loads run concurrently; insight and meme generation reuse the same in-memory results
+- Standalone `/api/market`, `/api/news`, `/api/insights/daily`, and `/api/memes/daily` unchanged
+
+**Files created or modified:**
+
+- Created: `backend/src/insights/interfaces/insight-generation.interfaces.ts`, `backend/src/memes/interfaces/meme-generation.interfaces.ts`, `backend/src/dashboard/interfaces/dashboard-shared-data.interfaces.ts`
+- Modified: `backend/src/dashboard/dashboard.service.ts`, `backend/src/dashboard/dashboard.controller.ts`, `backend/src/insights/insights.service.ts`, `backend/src/memes/memes.service.ts`, related specs, `backend/test/dashboard.e2e-spec.ts`, `docs/ai-interactions.md`
+
+**Commands and tests:**
+
+- `docker compose ps` — Pass (healthy)
+- `migration:show` / `run` — Pass (no pending migrations)
+- `backend`: build, lint, test (133), test:e2e (93), audit — Pass
+- `root`: build, lint, test — Pass
+
+**Live performance result:**
+
+- **200** in ~14.5s — all enabled sections `available`; no measurable latency improvement vs Stage 13 (~8.0s); duplicate market/news calls eliminated within the dashboard request (verified in E2E)
+
+**Remaining limitations before persistence/cache:**
+
+- Insight and meme still regenerate on every dashboard request
+- No cross-request cache or daily persistence
+- Total latency still dominated by live OpenRouter and Imgflip calls
+
+---
+
+## Documentation: Backend README
+
+**Date:** 2026-06-16
+
+**Summary:** Updated `backend/README.md` to document the implemented architecture, setup, environment variables, API endpoints, Postman flow, dashboard partial availability, migrations, testing, external services, security, and current limitations as of Stage 14.
+
+---
+
+## Documentation: Project structure reorganization
+
+**Date:** 2026-06-16
+
+**Summary:** Reorganized documentation into `README.md` (overview), `RUN.md` (operations), `backend/README.md` (backend design/API), `frontend/README.md` (scaffold status), and `docs/ai-interactions.md` (development log). Moved setup and test commands from the backend README to `RUN.md`.
+

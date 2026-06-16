@@ -12,6 +12,7 @@ import {
   INSIGHT_NEWS_LIMIT,
 } from './constants/insight.constants';
 import { DailyInsightResponseDto } from './dto/daily-insight-response.dto';
+import { InsightGenerationInput } from './interfaces/insight-generation.interfaces';
 import {
   InsightMarketFact,
   InsightNewsFact,
@@ -53,11 +54,32 @@ export class InsightsService {
       limit: INSIGHT_NEWS_LIMIT,
     });
 
-    const context = this.buildPromptContext(
-      preferences.investorProfile,
+    return this.generateFromData({
+      investorProfile: preferences.investorProfile,
       selectedCoins,
       marketItems,
       newsItems,
+    });
+  }
+
+  async generateFromData(
+    input: InsightGenerationInput,
+  ): Promise<DailyInsightResponseDto> {
+    if (input.selectedCoins.length === 0) {
+      throw new BadRequestException(
+        'Select at least one coin before generating an insight',
+      );
+    }
+
+    if (input.marketItems.length === 0) {
+      throw new BadGatewayException('Unable to generate insight');
+    }
+
+    const context = this.buildPromptContext(
+      input.investorProfile,
+      input.selectedCoins,
+      input.marketItems,
+      input.newsItems,
     );
 
     const messages = buildInsightMessages(context);

@@ -189,6 +189,35 @@ describe('InsightsService', () => {
       insightsService.getDailyInsight(userId),
     ).rejects.toBeInstanceOf(BadGatewayException);
   });
+
+  it('generateFromData does not call MarketService or NewsService', async () => {
+    openRouterClient.generateInsightContent.mockResolvedValue(validModelJson);
+
+    await insightsService.generateFromData({
+      investorProfile: InvestorProfile.LONG_TERM_HOLDER,
+      selectedCoins: [{ symbol: 'BTC', name: 'Bitcoin' }],
+      marketItems: [
+        {
+          symbol: 'BTC',
+          name: 'Bitcoin',
+          currentPrice: 65823,
+          changePercentage24h: 2.17,
+          high24h: 65893,
+          low24h: 63663,
+        },
+      ],
+      newsItems: [
+        {
+          title: 'Bitcoin market update',
+          description: 'Short description',
+        },
+      ],
+    });
+
+    expect(marketService.getMarketData).not.toHaveBeenCalled();
+    expect(newsService.getNews).not.toHaveBeenCalled();
+    expect(openRouterClient.generateInsightContent).toHaveBeenCalled();
+  });
 });
 
 describe('insight prompt builder', () => {

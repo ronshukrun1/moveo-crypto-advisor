@@ -153,6 +153,27 @@ describe('MemesService', () => {
       BadGatewayException,
     );
   });
+
+  it('generateFromMarketData does not call MarketService', async () => {
+    imgflipClient.captionImage.mockResolvedValue({
+      url: 'https://i.imgflip.com/example.jpg',
+      pageUrl: 'https://imgflip.com/i/example',
+    });
+
+    await memesService.generateFromMarketData({
+      selectedCoins: [{ symbol: 'BTC', name: 'Bitcoin' }],
+      marketItems: [
+        {
+          symbol: 'BTC',
+          name: 'Bitcoin',
+          changePercentage24h: 2.2,
+        },
+      ],
+    });
+
+    expect(marketService.getMarketData).not.toHaveBeenCalled();
+    expect(imgflipClient.captionImage).toHaveBeenCalled();
+  });
 });
 
 describe('meme caption builder', () => {

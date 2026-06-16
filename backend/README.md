@@ -1,98 +1,246 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Moveo Crypto Advisor — Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+The backend is built with **NestJS** and **TypeScript** and runs on **Node.js**. It exposes a REST API for a personalized cryptocurrency dashboard: content is tailored to each authenticated user’s investor profile, display preferences, and selected coins. User identity and settings are stored in PostgreSQL; market data, news, AI insight, and memes are fetched through external providers.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+**Local setup, migrations, and test commands:** see [../RUN.md](../RUN.md).
 
-## Description
+The **frontend** in this repository is a React + Vite scaffold only. Product screens and API integration are not yet implemented.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+---
 
-## Project setup
+## Overview
 
-```bash
-$ npm install
+| Capability | Description |
+|------------|-------------|
+| Auth | Registration, login, JWT-protected routes |
+| Onboarding | Atomic save of preferences, selected coins, and `onboardingCompleted` |
+| Preferences | Investor profile and per-section display toggles |
+| Coins | Read-only catalog of supported active cryptocurrencies |
+| Selected coins | Full replace of the user’s active coin list |
+| Market | Live CoinGecko data for selected coins |
+| News | Personalized NewsData articles with pagination |
+| Insights | Educational AI text via OpenRouter (not financial advice) |
+| Memes | Deterministic captions + Imgflip image generation |
+| Dashboard | Single orchestrated response with partial provider failure support |
+
+---
+
+## Architecture
+
+```text
+Client
+  → Controllers        (HTTP, guards, DTO binding, Swagger)
+  → Services           (business logic, orchestration)
+  → TypeORM / Clients  (PostgreSQL repositories, external HTTP)
 ```
 
-## Compile and run the project
+**Controllers** — Route handling only. No direct repository or Axios access.
 
-```bash
-# development
-$ npm run start
+**Services** — Domain rules and workflow. Dashboard orchestration lives in `DashboardService`.
 
-# watch mode
-$ npm run start:dev
+**External clients** — `CoinGeckoClient`, `NewsDataClient`, `OpenRouterClient`, `ImgflipClient`. Map upstream failures to safe HTTP exceptions without exposing credentials or raw responses.
 
-# production mode
-$ npm run start:prod
+**DTOs & validation** — Global `ValidationPipe` with `whitelist`, `forbidNonWhitelisted`, and `transform`. Unknown fields are rejected.
+
+**Exception filter** — `HttpExceptionFilter` returns a consistent JSON error shape. Stack traces and provider internals are not exposed to clients.
+
+**Environment** — All configuration variables are validated at startup via `class-validator`.
+
+---
+
+## Main Modules
+
+| Module | Responsibility |
+|--------|----------------|
+| `HealthModule` | Application and database health check |
+| `UsersModule` | User entity and lookup |
+| `AuthModule` | Register, login, JWT strategy and guard |
+| `CoinsModule` | Supported coin catalog |
+| `PreferencesModule` | User content preferences |
+| `SelectedCoinsModule` | User coin selections |
+| `OnboardingModule` | Atomic onboarding transaction |
+| `MarketModule` | CoinGecko market data |
+| `NewsModule` | NewsData articles |
+| `InsightsModule` | OpenRouter educational insight |
+| `MemesModule` | Imgflip meme generation |
+| `DashboardModule` | Aggregated dashboard response |
+
+---
+
+## Authentication
+
+```text
+POST /api/auth/register  → 201
+POST /api/auth/login     → 200 (returns accessToken)
+Protected routes         → Authorization: Bearer <accessToken>
 ```
 
-## Run tests
+The JWT `sub` claim identifies the user. Client-supplied `userId` in query, body, or route parameters is never trusted.
 
-```bash
-# unit tests
-$ npm run test
+`GET /api/auth/me` reloads the user from the database and returns **404** if the account was deleted after the token was issued.
 
-# e2e tests
-$ npm run test:e2e
+---
 
-# test coverage
-$ npm run test:cov
+## API Endpoint Reference
+
+Global prefix: `/api`.
+
+| Method | Path | Auth | Purpose | Success | Common errors |
+|--------|------|------|---------|---------|---------------|
+| `GET` | `/health` | Public | App and DB health | `200` | `503` |
+| `POST` | `/auth/register` | Public | Create account | `201` | `400`, `409` |
+| `POST` | `/auth/login` | Public | Obtain JWT | `200` | `400`, `401` |
+| `GET` | `/auth/me` | JWT | Current user | `200` | `401`, `404` |
+| `GET` | `/coins` | Public | Active coin catalog | `200` | — |
+| `GET` | `/preferences` | JWT | Content preferences | `200` | `401`, `404` |
+| `PATCH` | `/preferences` | JWT | Update preferences | `200` | `400`, `401`, `404` |
+| `GET` | `/selected-coins` | JWT | Selected coins | `200` | `401`, `404` |
+| `PUT` | `/selected-coins` | JWT | Replace selections | `200` | `400`, `401`, `404` |
+| `POST` | `/onboarding` | JWT | Complete onboarding | `200` | `400`, `401`, `404` |
+| `GET` | `/market` | JWT | Market data | `200` | `401`, `404`, `502`, `503`, `504` |
+| `GET` | `/news` | JWT | News articles | `200` | `400`, `401`, `404`, `502`, `503`, `504` |
+| `GET` | `/insights/daily` | JWT | AI insight | `200` | `400`, `401`, `502`, `503`, `504` |
+| `GET` | `/memes/daily` | JWT | Meme image | `200` | `400`, `401`, `502`, `503`, `504` |
+| `GET` | `/dashboard` | JWT | Full dashboard | `200` | `400`, `401`, `404`, `409`, `500` |
+
+### `GET /api/news` query parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | integer | `5` | Articles to return (**1–10**) |
+| `page` | string | — | Opaque NewsData pagination token (max 500 chars) |
+
+`GET /api/dashboard` rejects unknown query parameters (`400`).
+
+---
+
+## Validation and Error Handling
+
+### Request validation
+
+- Body and query DTOs use `class-validator` decorators.
+- Extra properties are stripped or rejected (`forbidNonWhitelisted`).
+
+### Error response shape
+
+```json
+{
+  "statusCode": 400,
+  "message": "Validation failed",
+  "error": "Bad Request",
+  "timestamp": "2026-06-16T10:00:00.000Z",
+  "path": "/api/example",
+  "details": ["field must be a string"]
+}
 ```
 
-## Deployment
+- `details` — validation failures only.
+- `database` — may appear on health `503` responses.
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+Never returned to clients: stack traces, SQL errors, password hashes, API keys, raw upstream bodies.
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+---
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
+## Database
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### Tables
 
-## Resources
+| Table | Purpose |
+|-------|---------|
+| `users` | Accounts and `onboardingCompleted` |
+| `coins` | Supported cryptocurrency catalog |
+| `user_preferences` | Investor profile and display toggles |
+| `user_selected_coins` | User-to-coin selections |
+| `migrations` | TypeORM migration history (internal) |
 
-Check out a few resources that may come in handy when working with NestJS:
+### Migrations
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+Schema changes are applied only through TypeORM migrations (`synchronize: false`, `migrationsRun: false`). See [../RUN.md](../RUN.md) for commands.
 
-## Support
+Existing migrations:
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+- `CreateUsersTable`
+- `CreateCoinsTable`
+- `CreateUserPreferencesTable`
+- `CreateUserSelectedCoinsTable`
 
-## Stay in touch
+---
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+## External Integrations
 
-## License
+| Provider | Role | Auth |
+|----------|------|------|
+| CoinGecko | Market prices, 24h change, highs/lows | API key header |
+| NewsData | Crypto news for selected symbols | API key query param |
+| OpenRouter | Educational insight JSON | Bearer API key |
+| Imgflip | Meme image from template + captions | **Username and password** (form POST) |
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+All calls originate from the backend. Credentials are configured in `backend/.env` and are not exposed to clients.
+
+---
+
+## Dashboard Behavior
+
+### Partial availability
+
+Each content section returns `available`, `unavailable`, or `disabled`. A failing optional provider can still yield overall **`200 OK`** with only affected sections marked `unavailable`.
+
+| Status | Meaning |
+|--------|---------|
+| `available` | Data loaded successfully |
+| `unavailable` | Enabled but failed; safe `message` included |
+| `disabled` | Turned off in preferences; not shown to the user |
+
+`GET /api/dashboard` requires completed onboarding (`409` otherwise).
+
+### Hidden dependencies
+
+If `showMarketPrices` or `showNews` is `false` but insight or meme is enabled, market or news may still be loaded internally while the public section remains `disabled`.
+
+### Request-scoped market/news reuse
+
+Within a single dashboard request:
+
+- Market and news are each fetched **at most once** when required by enabled sections or hidden dependencies.
+- Loaded data is passed to `InsightsService.generateFromData()` and `MemesService.generateFromMarketData()`.
+- Standalone `/api/insights/daily` and `/api/memes/daily` still load their own dependencies per request.
+- No cross-request cache or global mutable shared state.
+
+---
+
+## Swagger
+
+Interactive documentation: http://localhost:3000/api/docs
+
+Click **Authorize**, then paste the **raw JWT** (`accessToken` from login). Swagger UI sends it as `Authorization: Bearer <token>` automatically — do not type the `Bearer` prefix in the input field.
+
+---
+
+## Testing
+
+- **Unit tests** — `npm test` (mocks external HTTP and dependencies).
+- **E2E tests** — `npm run test:e2e` (full `AppModule`, Docker PostgreSQL, mocked external clients).
+
+See [../RUN.md](../RUN.md) for full quality commands.
+
+---
+
+## Current Limitations
+
+- No cross-request cache or Redis.
+- Insight and meme regenerate on every `/daily` and dashboard request — no daily persistence tables yet.
+- Market and news are always fetched live when required.
+- Dashboard latency is dominated by OpenRouter (and Imgflip when enabled).
+- Free-tier external API rate limits may affect manual testing.
+- Frontend product UI and API integration are not implemented in this repository.
+
+---
+
+## Security Summary
+
+- bcrypt password hashing (12 rounds)
+- JWT Bearer authentication
+- Unique email constraint
+- Startup environment validation
+- Safe upstream error mapping
+- Secrets excluded from version control

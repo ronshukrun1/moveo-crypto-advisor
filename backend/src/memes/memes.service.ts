@@ -6,6 +6,7 @@ import {
 import { MarketService } from '../market/market.service';
 import { SelectedCoinsService } from '../selected-coins/selected-coins.service';
 import { DailyMemeResponseDto } from './dto/daily-meme-response.dto';
+import { MemeGenerationInput } from './interfaces/meme-generation.interfaces';
 import { ImgflipClient } from './imgflip.client';
 import { buildMemeCaptions } from './utils/meme-caption.builder';
 
@@ -34,8 +35,27 @@ export class MemesService {
       throw new BadGatewayException('Unable to generate meme');
     }
 
+    return this.generateFromMarketData({
+      selectedCoins,
+      marketItems,
+    });
+  }
+
+  async generateFromMarketData(
+    input: MemeGenerationInput,
+  ): Promise<DailyMemeResponseDto> {
+    if (input.selectedCoins.length === 0) {
+      throw new BadRequestException(
+        'Select at least one coin before generating a meme',
+      );
+    }
+
+    if (input.marketItems.length === 0) {
+      throw new BadGatewayException('Unable to generate meme');
+    }
+
     const captions = buildMemeCaptions(
-      marketItems.map((item) => ({
+      input.marketItems.map((item) => ({
         symbol: item.symbol,
         name: item.name,
         changePercentage24h: item.changePercentage24h,

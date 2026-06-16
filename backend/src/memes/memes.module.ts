@@ -11,6 +11,6 @@ import { MemesService } from './memes.service';
   imports: [HttpModule, AuthModule, SelectedCoinsModule, MarketModule],
   controllers: [MemesController],
   providers: [MemesService, ImgflipClient],
-  exports: [ImgflipClient],
+  exports: [ImgflipClient, MemesService],
 })
 export class MemesModule {}
