@@ -15,7 +15,9 @@ import { CoinGeckoClient } from '../src/market/coin-gecko.client';
 import { NewsDataClient } from '../src/news/news-data.client';
 import { OpenRouterClient } from '../src/insights/open-router.client';
 import { ImgflipClient } from '../src/memes/imgflip.client';
-import { clearAppCache } from './utils/clear-app-cache';
+import { clearAppCache, deleteCacheKey } from './utils/clear-app-cache';
+import { buildMarketCacheKey } from '../src/market/utils/market-cache.utils';
+import { buildNewsCacheKey } from '../src/news/utils/news-cache.utils';
 import { InvestorProfile } from '../src/preferences/enums/investor-profile.enum';
 
 interface DashboardUserResponse {
@@ -41,11 +43,17 @@ interface DashboardResponse {
     symbol: string;
     name: string;
   }>;
-  market: { status: string; items?: unknown[]; message?: string };
+  market: {
+    status: string;
+    items?: unknown[];
+    isStale?: boolean;
+    message?: string;
+  };
   news: {
     status: string;
     items?: unknown[];
     nextPage?: string | null;
+    isStale?: boolean;
     message?: string;
   };
   insight: { status: string; data?: Record<string, unknown>; message?: string };
@@ -555,5 +563,66 @@ describe('Dashboard (e2e)', () => {
 
     expect(coinGeckoClient.fetchMarkets).toHaveBeenCalledTimes(1);
     expect(newsDataClient.fetchNews).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks market as stale when fresh cache expires and provider fails', async () => {
+    const token = await registerAndLogin();
+    await onboardUser(token);
+    mockExternalDependencies();
+
+    await request(app.getHttpServer())
+      .get('/api/dashboard')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    await deleteCacheKey(
+      app,
+      buildMarketCacheKey(['bitcoin', 'ethereum'], 'fresh'),
+    );
+
+    coinGeckoClient.fetchMarkets.mockRejectedValue(
+      new GatewayTimeoutException('Market data provider request timed out'),
+    );
+
+    const response = await request(app.getHttpServer())
+      .get('/api/dashboard')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const body = response.body as DashboardResponse;
+    expect(body.market.status).toBe('available');
+    expect(body.market.isStale).toBe(true);
+    expect(body.market.items).toBeDefined();
+    expect(JSON.stringify(body)).not.toContain('cache');
+  });
+
+  it('marks news as stale when fresh cache expires and provider fails', async () => {
+    const token = await registerAndLogin();
+    await onboardUser(token);
+    mockExternalDependencies();
+
+    await request(app.getHttpServer())
+      .get('/api/dashboard')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    await deleteCacheKey(
+      app,
+      buildNewsCacheKey(['BTC', 'ETH'], 5, undefined, 'fresh'),
+    );
+
+    newsDataClient.fetchNews.mockRejectedValue(
+      new GatewayTimeoutException('News request timed out'),
+    );
+
+    const response = await request(app.getHttpServer())
+      .get('/api/dashboard')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const body = response.body as DashboardResponse;
+    expect(body.news.status).toBe('available');
+    expect(body.news.isStale).toBe(true);
+    expect(body.news.items).toBeDefined();
   });
 });

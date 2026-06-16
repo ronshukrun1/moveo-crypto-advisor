@@ -20,8 +20,11 @@ describe('DashboardService', () => {
   let usersService: { findById: jest.Mock };
   let preferencesService: { getPreferences: jest.Mock };
   let selectedCoinsService: { getSelectedCoins: jest.Mock };
-  let marketService: { getMarketData: jest.Mock };
-  let newsService: { getNews: jest.Mock };
+  let marketService: {
+    getMarketData: jest.Mock;
+    getMarketDataWithMetadata: jest.Mock;
+  };
+  let newsService: { getNews: jest.Mock; getNewsWithMetadata: jest.Mock };
   let insightsService: {
     generateAndPersistFromData: jest.Mock;
     tryGetValidStoredDailyInsight: jest.Mock;
@@ -116,8 +119,11 @@ describe('DashboardService', () => {
     usersService = { findById: jest.fn() };
     preferencesService = { getPreferences: jest.fn() };
     selectedCoinsService = { getSelectedCoins: jest.fn() };
-    marketService = { getMarketData: jest.fn() };
-    newsService = { getNews: jest.fn() };
+    marketService = {
+      getMarketData: jest.fn(),
+      getMarketDataWithMetadata: jest.fn(),
+    };
+    newsService = { getNews: jest.fn(), getNewsWithMetadata: jest.fn() };
     insightsService = {
       generateAndPersistFromData: jest.fn(),
       tryGetValidStoredDailyInsight: jest.fn(),
@@ -147,8 +153,14 @@ describe('DashboardService', () => {
     usersService.findById.mockResolvedValue(user);
     preferencesService.getPreferences.mockResolvedValue(preferences);
     selectedCoinsService.getSelectedCoins.mockResolvedValue(selectedCoins);
-    marketService.getMarketData.mockResolvedValue(marketData);
-    newsService.getNews.mockResolvedValue(newsData);
+    marketService.getMarketDataWithMetadata.mockResolvedValue({
+      data: marketData,
+      isStale: false,
+    });
+    newsService.getNewsWithMetadata.mockResolvedValue({
+      data: newsData,
+      isStale: false,
+    });
     insightsService.tryGetValidStoredDailyInsight.mockResolvedValue(null);
     memesService.tryGetValidStoredDailyMeme.mockResolvedValue(null);
     insightsService.generateAndPersistFromData.mockResolvedValue(insightData);
@@ -182,9 +194,11 @@ describe('DashboardService', () => {
 
     await dashboardService.getDashboard(userId);
 
-    expect(marketService.getMarketData).toHaveBeenCalledTimes(1);
-    expect(newsService.getNews).toHaveBeenCalledTimes(1);
-    expect(newsService.getNews).toHaveBeenCalledWith(userId, { limit: 5 });
+    expect(marketService.getMarketDataWithMetadata).toHaveBeenCalledTimes(1);
+    expect(newsService.getNewsWithMetadata).toHaveBeenCalledTimes(1);
+    expect(newsService.getNewsWithMetadata).toHaveBeenCalledWith(userId, {
+      limit: 5,
+    });
     expect(insightsService.generateAndPersistFromData).toHaveBeenCalledWith(
       userId,
       {
@@ -215,8 +229,8 @@ describe('DashboardService', () => {
 
     const result = await dashboardService.getDashboard(userId);
 
-    expect(marketService.getMarketData).not.toHaveBeenCalled();
-    expect(newsService.getNews).not.toHaveBeenCalled();
+    expect(marketService.getMarketDataWithMetadata).not.toHaveBeenCalled();
+    expect(newsService.getNewsWithMetadata).not.toHaveBeenCalled();
     expect(insightsService.generateAndPersistFromData).not.toHaveBeenCalled();
     expect(
       memesService.generateAndPersistFromMarketData,
@@ -239,8 +253,8 @@ describe('DashboardService', () => {
 
     const result = await dashboardService.getDashboard(userId);
 
-    expect(marketService.getMarketData).toHaveBeenCalledTimes(1);
-    expect(newsService.getNews).toHaveBeenCalledTimes(1);
+    expect(marketService.getMarketDataWithMetadata).toHaveBeenCalledTimes(1);
+    expect(newsService.getNewsWithMetadata).toHaveBeenCalledTimes(1);
     expect(result.market).toEqual({ status: 'disabled' });
     expect(result.news).toEqual({ status: 'disabled' });
     expect(result.insight.status).toBe('available');
@@ -258,7 +272,7 @@ describe('DashboardService', () => {
 
     const result = await dashboardService.getDashboard(userId);
 
-    expect(newsService.getNews).toHaveBeenCalledTimes(1);
+    expect(newsService.getNewsWithMetadata).toHaveBeenCalledTimes(1);
     expect(result.news).toEqual({ status: 'disabled' });
     expect(result.insight.status).toBe('available');
   });
@@ -270,10 +284,12 @@ describe('DashboardService', () => {
 
     expect(result.market).toEqual({
       status: 'available',
+      isStale: false,
       items: marketData.items,
     });
     expect(result.news).toEqual({
       status: 'available',
+      isStale: false,
       items: newsData.items,
       nextPage: null,
     });
@@ -284,13 +300,13 @@ describe('DashboardService', () => {
 
   it('returns unavailable market and dependent sections when shared market fails', async () => {
     mockBaseDependencies();
-    marketService.getMarketData.mockRejectedValue(
+    marketService.getMarketDataWithMetadata.mockRejectedValue(
       new GatewayTimeoutException('Market data provider request timed out'),
     );
 
     const result = await dashboardService.getDashboard(userId);
 
-    expect(marketService.getMarketData).toHaveBeenCalledTimes(1);
+    expect(marketService.getMarketDataWithMetadata).toHaveBeenCalledTimes(1);
     expect(result.market).toEqual({
       status: 'unavailable',
       message: DASHBOARD_SECTION_MESSAGES.market,
@@ -306,11 +322,13 @@ describe('DashboardService', () => {
 
   it('returns unavailable news and insight when shared news fails', async () => {
     mockBaseDependencies();
-    newsService.getNews.mockRejectedValue(new Error('News provider failed'));
+    newsService.getNewsWithMetadata.mockRejectedValue(
+      new Error('News provider failed'),
+    );
 
     const result = await dashboardService.getDashboard(userId);
 
-    expect(newsService.getNews).toHaveBeenCalledTimes(1);
+    expect(newsService.getNewsWithMetadata).toHaveBeenCalledTimes(1);
     expect(result.news).toEqual({
       status: 'unavailable',
       message: DASHBOARD_SECTION_MESSAGES.news,
@@ -368,6 +386,34 @@ describe('DashboardService', () => {
     ).not.toHaveBeenCalled();
     expect(result.insight).toEqual({ status: 'available', data: insightData });
     expect(result.meme).toEqual({ status: 'available', data: memeData });
+  });
+
+  it('marks market and news sections as stale when metadata reports stale data', async () => {
+    mockBaseDependencies();
+    marketService.getMarketDataWithMetadata.mockResolvedValue({
+      data: marketData,
+      isStale: true,
+    });
+    newsService.getNewsWithMetadata.mockResolvedValue({
+      data: newsData,
+      isStale: true,
+    });
+
+    const result = await dashboardService.getDashboard(userId);
+
+    expect(result.market).toEqual({
+      status: 'available',
+      isStale: true,
+      items: marketData.items,
+    });
+    expect(result.news).toEqual({
+      status: 'available',
+      isStale: true,
+      items: newsData.items,
+      nextPage: null,
+    });
+    expect(insightsService.generateAndPersistFromData).toHaveBeenCalled();
+    expect(memesService.generateAndPersistFromMarketData).toHaveBeenCalled();
   });
 
   it('does not expose sensitive fields in the dashboard response', async () => {

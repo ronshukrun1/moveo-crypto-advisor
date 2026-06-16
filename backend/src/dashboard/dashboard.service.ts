@@ -125,9 +125,10 @@ export class DashboardService {
     userId: number,
   ): Promise<SharedMarketDataResult> {
     try {
-      const { items } = await this.marketService.getMarketData(userId);
+      const { data, isStale } =
+        await this.marketService.getMarketDataWithMetadata(userId);
       this.logger.debug('Dashboard shared market data loaded');
-      return { status: 'loaded', items };
+      return { status: 'loaded', items: data.items, isStale };
     } catch (error) {
       this.logSectionFailure('shared market', error);
       return { status: 'failed' };
@@ -138,11 +139,17 @@ export class DashboardService {
     userId: number,
   ): Promise<SharedNewsDataResult> {
     try {
-      const { items, nextPage } = await this.newsService.getNews(userId, {
-        limit: DASHBOARD_NEWS_LIMIT,
-      });
+      const { data, isStale } = await this.newsService.getNewsWithMetadata(
+        userId,
+        { limit: DASHBOARD_NEWS_LIMIT },
+      );
       this.logger.debug('Dashboard shared news data loaded');
-      return { status: 'loaded', items, nextPage };
+      return {
+        status: 'loaded',
+        items: data.items,
+        nextPage: data.nextPage,
+        isStale,
+      };
     } catch (error) {
       this.logSectionFailure('shared news', error);
       return { status: 'failed' };
@@ -164,7 +171,11 @@ export class DashboardService {
       };
     }
 
-    return { status: 'available', items: sharedMarket.items };
+    return {
+      status: 'available',
+      isStale: sharedMarket.isStale,
+      items: sharedMarket.items,
+    };
   }
 
   private buildNewsSection(
@@ -184,6 +195,7 @@ export class DashboardService {
 
     return {
       status: 'available',
+      isStale: sharedNews.isStale,
       items: sharedNews.items,
       nextPage: sharedNews.nextPage,
     };

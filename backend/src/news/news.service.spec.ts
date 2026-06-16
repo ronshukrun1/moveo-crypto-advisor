@@ -89,6 +89,10 @@ describe('NewsService', () => {
                 return 300;
               }
 
+              if (key === 'NEWS_STALE_TTL_SECONDS') {
+                return 3600;
+              }
+
               throw new Error(`Unexpected config key: ${key}`);
             }),
           },
@@ -157,7 +161,7 @@ describe('NewsService', () => {
     await newsService.getNews(userId, { limit: 5 });
 
     expect(safeCacheService.set).toHaveBeenCalledWith(
-      buildNewsCacheKey(['BTC'], 5),
+      buildNewsCacheKey(['BTC'], 5, undefined, 'fresh'),
       expect.objectContaining({
         nextPage: 'next-token',
         items: expect.arrayContaining([
@@ -165,6 +169,13 @@ describe('NewsService', () => {
         ]) as unknown,
       }),
       300,
+    );
+    expect(safeCacheService.set).toHaveBeenCalledWith(
+      buildNewsCacheKey(['BTC'], 5, undefined, 'stale'),
+      expect.objectContaining({
+        nextPage: 'next-token',
+      }),
+      3600,
     );
   });
 
@@ -187,19 +198,19 @@ describe('NewsService', () => {
 
     expect(safeCacheService.get).toHaveBeenNthCalledWith(
       1,
-      buildNewsCacheKey(['BTC'], 5),
+      buildNewsCacheKey(['BTC'], 5, undefined, 'fresh'),
     );
     expect(safeCacheService.get).toHaveBeenNthCalledWith(
       2,
-      buildNewsCacheKey(['BTC'], 10),
+      buildNewsCacheKey(['BTC'], 10, undefined, 'fresh'),
     );
     expect(safeCacheService.get).toHaveBeenNthCalledWith(
       3,
-      buildNewsCacheKey(['BTC'], 5, 'page-token'),
+      buildNewsCacheKey(['BTC'], 5, 'page-token', 'fresh'),
     );
   });
 
-  it('does not cache provider errors', async () => {
+  it('does not cache provider errors when no stale entry exists', async () => {
     selectedCoinsService.getSelectedCoins.mockResolvedValue({
       items: [
         { id: 1, coingeckoId: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
@@ -213,6 +224,92 @@ describe('NewsService', () => {
       GatewayTimeoutException,
     );
     expect(safeCacheService.set).not.toHaveBeenCalled();
+  });
+
+  it('returns stale data after a provider failure when stale cache exists', async () => {
+    const cachedNews = {
+      items: [
+        {
+          id: 'article-1',
+          title: 'Bitcoin market update',
+          description: 'Short description',
+          url: 'https://example.com/article-1',
+          imageUrl: 'https://example.com/image.jpg',
+          sourceName: 'Source Name',
+          sourceUrl: 'https://example.com',
+          creator: ['Author Name'],
+          relatedCoins: ['BTC'],
+          publishedAt: '2026-06-14T19:30:38.000Z',
+        },
+      ],
+      nextPage: 'next-token',
+    };
+    selectedCoinsService.getSelectedCoins.mockResolvedValue({
+      items: [
+        { id: 1, coingeckoId: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
+      ],
+    });
+    safeCacheService.get.mockImplementation((key: string) => {
+      if (key === buildNewsCacheKey(['BTC'], 5, undefined, 'stale')) {
+        return Promise.resolve(cachedNews);
+      }
+
+      return Promise.resolve(undefined);
+    });
+    newsDataClient.fetchNews.mockRejectedValue(
+      new GatewayTimeoutException('News request timed out'),
+    );
+
+    const result = await newsService.getNewsWithMetadata(userId, { limit: 5 });
+
+    expect(result).toEqual({ data: cachedNews, isStale: true });
+    expect(newsDataClient.fetchNews).toHaveBeenCalled();
+    expect(safeCacheService.set).not.toHaveBeenCalled();
+  });
+
+  it('returns fresh metadata on a cache hit', async () => {
+    const cachedNews = {
+      items: [],
+      nextPage: null,
+    };
+    selectedCoinsService.getSelectedCoins.mockResolvedValue({
+      items: [
+        { id: 1, coingeckoId: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
+      ],
+    });
+    safeCacheService.get.mockResolvedValue(cachedNews);
+
+    const result = await newsService.getNewsWithMetadata(userId, { limit: 5 });
+
+    expect(result).toEqual({ data: cachedNews, isStale: false });
+  });
+
+  it('caches an empty successful provider response in fresh and stale layers', async () => {
+    selectedCoinsService.getSelectedCoins.mockResolvedValue({
+      items: [
+        { id: 1, coingeckoId: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
+      ],
+    });
+    newsDataClient.fetchNews.mockResolvedValue({
+      status: 'success',
+      totalResults: 0,
+      results: [],
+      nextPage: null,
+    });
+
+    const result = await newsService.getNews(userId, { limit: 5 });
+
+    expect(result).toEqual({ items: [], nextPage: null });
+    expect(safeCacheService.set).toHaveBeenCalledWith(
+      buildNewsCacheKey(['BTC'], 5, undefined, 'fresh'),
+      { items: [], nextPage: null },
+      300,
+    );
+    expect(safeCacheService.set).toHaveBeenCalledWith(
+      buildNewsCacheKey(['BTC'], 5, undefined, 'stale'),
+      { items: [], nextPage: null },
+      3600,
+    );
   });
 
   it('forwards selected symbols, limit, and pagination token', async () => {

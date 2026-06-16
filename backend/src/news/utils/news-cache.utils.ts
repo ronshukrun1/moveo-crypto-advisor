@@ -1,5 +1,7 @@
 import { createHash } from 'crypto';
 
+export type NewsCacheLayer = 'fresh' | 'stale';
+
 function encodePageToken(page?: string): string {
   const trimmed = page?.trim();
 
@@ -13,11 +15,12 @@ function encodePageToken(page?: string): string {
 export function buildNewsCacheKey(
   symbols: string[],
   limit: number,
-  page?: string,
+  page: string | undefined,
+  layer: NewsCacheLayer,
 ): string {
   const sortedSymbols = [...symbols]
     .map((symbol) => symbol.toUpperCase())
     .sort();
 
-  return `news:${sortedSymbols.join(',')}:limit=${limit}:page=${encodePageToken(page)}`;
+  return `news:${layer}:${sortedSymbols.join(',')}:limit=${limit}:page=${encodePageToken(page)}`;
 }

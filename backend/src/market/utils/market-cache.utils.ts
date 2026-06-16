@@ -1,5 +1,10 @@
-export function buildMarketCacheKey(coingeckoIds: string[]): string {
+export type MarketCacheLayer = 'fresh' | 'stale';
+
+export function buildMarketCacheKey(
+  coingeckoIds: string[],
+  layer: MarketCacheLayer,
+): string {
   const sortedIds = [...coingeckoIds].sort();
 
-  return `market:usd:${sortedIds.join(',')}`;
+  return `market:${layer}:usd:${sortedIds.join(',')}`;
 }

@@ -31,6 +31,8 @@ const defaultTestEnvironment = {
   IMGFLIP_TIMEOUT_MS: '5000',
   MARKET_CACHE_TTL_SECONDS: '120',
   NEWS_CACHE_TTL_SECONDS: '300',
+  MARKET_STALE_TTL_SECONDS: '1800',
+  NEWS_STALE_TTL_SECONDS: '3600',
 };
 
 for (const [key, value] of Object.entries(defaultTestEnvironment)) {

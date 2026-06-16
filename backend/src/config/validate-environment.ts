@@ -21,5 +21,23 @@ export function validateEnvironment(
     throw new Error(`Environment validation failed: ${messages}`);
   }
 
+  if (
+    validatedConfig.MARKET_STALE_TTL_SECONDS <
+    validatedConfig.MARKET_CACHE_TTL_SECONDS
+  ) {
+    throw new Error(
+      'Environment validation failed: MARKET_STALE_TTL_SECONDS must be greater than or equal to MARKET_CACHE_TTL_SECONDS',
+    );
+  }
+
+  if (
+    validatedConfig.NEWS_STALE_TTL_SECONDS <
+    validatedConfig.NEWS_CACHE_TTL_SECONDS
+  ) {
+    throw new Error(
+      'Environment validation failed: NEWS_STALE_TTL_SECONDS must be greater than or equal to NEWS_CACHE_TTL_SECONDS',
+    );
+  }
+
   return validatedConfig;
 }

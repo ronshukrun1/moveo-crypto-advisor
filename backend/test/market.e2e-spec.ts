@@ -12,7 +12,8 @@ import { AppModule } from '../src/app.module';
 import { configureApplication } from '../src/app.setup';
 import { InvestorProfile } from '../src/preferences/enums/investor-profile.enum';
 import { CoinGeckoClient } from '../src/market/coin-gecko.client';
-import { clearAppCache } from './utils/clear-app-cache';
+import { buildMarketCacheKey } from '../src/market/utils/market-cache.utils';
+import { clearAppCache, deleteCacheKey } from './utils/clear-app-cache';
 
 interface MarketItemResponse {
   id: string;
@@ -349,5 +350,76 @@ describe('Market (e2e)', () => {
 
     expect((response.body as MarketListResponse).items).toHaveLength(1);
     expect((response.body as MarketListResponse).items[0].id).toBe('bitcoin');
+  });
+
+  it('returns stale market data after fresh cache expires and provider fails', async () => {
+    const token = await registerAndLogin();
+
+    await request(app.getHttpServer())
+      .post('/api/onboarding')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...onboardingPayload, coinIds: [1] })
+      .expect(200);
+
+    coinGeckoClient.fetchMarkets.mockResolvedValue([mockMarketItem]);
+
+    const firstResponse = await request(app.getHttpServer())
+      .get('/api/market')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    await deleteCacheKey(app, buildMarketCacheKey(['bitcoin'], 'fresh'));
+
+    coinGeckoClient.fetchMarkets.mockRejectedValue(
+      new GatewayTimeoutException('Market data provider request timed out'),
+    );
+
+    const staleResponse = await request(app.getHttpServer())
+      .get('/api/market')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(staleResponse.body).toEqual(firstResponse.body);
+    expect(JSON.stringify(staleResponse.body)).not.toContain('isStale');
+    expect(JSON.stringify(staleResponse.body)).not.toContain('cache');
+  });
+
+  it('does not reuse stale market data for a different selected coin set', async () => {
+    const token = await registerAndLogin();
+
+    await request(app.getHttpServer())
+      .post('/api/onboarding')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...onboardingPayload, coinIds: [1] })
+      .expect(200);
+
+    coinGeckoClient.fetchMarkets.mockResolvedValue([mockMarketItem]);
+
+    await request(app.getHttpServer())
+      .get('/api/market')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .put('/api/selected-coins')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ coinIds: [1, 2] })
+      .expect(200);
+
+    await deleteCacheKey(
+      app,
+      buildMarketCacheKey(['bitcoin', 'ethereum'], 'fresh'),
+    );
+
+    coinGeckoClient.fetchMarkets.mockRejectedValue(
+      new GatewayTimeoutException('Market data provider request timed out'),
+    );
+
+    const response = await request(app.getHttpServer())
+      .get('/api/market')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(504);
+
+    expect((response.body as ErrorResponseBody).statusCode).toBe(504);
   });
 });

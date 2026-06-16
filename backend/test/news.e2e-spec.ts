@@ -12,7 +12,8 @@ import { AppModule } from '../src/app.module';
 import { configureApplication } from '../src/app.setup';
 import { InvestorProfile } from '../src/preferences/enums/investor-profile.enum';
 import { NewsDataClient } from '../src/news/news-data.client';
-import { clearAppCache } from './utils/clear-app-cache';
+import { buildNewsCacheKey } from '../src/news/utils/news-cache.utils';
+import { clearAppCache, deleteCacheKey } from './utils/clear-app-cache';
 
 interface NewsItemResponse {
   id: string;
@@ -458,5 +459,139 @@ describe('News (e2e)', () => {
       .expect(502);
 
     expect((response.body as ErrorResponseBody).statusCode).toBe(502);
+  });
+
+  it('returns stale news after fresh cache expires and provider fails', async () => {
+    const token = await registerAndLogin();
+
+    await request(app.getHttpServer())
+      .post('/api/onboarding')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...onboardingPayload, coinIds: [1] })
+      .expect(200);
+
+    newsDataClient.fetchNews.mockResolvedValue({
+      status: 'success',
+      totalResults: 1,
+      results: [mockArticle],
+      nextPage: 'next-token',
+    });
+
+    const firstResponse = await request(app.getHttpServer())
+      .get('/api/news?limit=5')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    await deleteCacheKey(
+      app,
+      buildNewsCacheKey(['BTC'], 5, undefined, 'fresh'),
+    );
+
+    newsDataClient.fetchNews.mockRejectedValue(
+      new GatewayTimeoutException('News request timed out'),
+    );
+
+    const staleResponse = await request(app.getHttpServer())
+      .get('/api/news?limit=5')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(staleResponse.body).toEqual(firstResponse.body);
+    expect(JSON.stringify(staleResponse.body)).not.toContain('isStale');
+  });
+
+  it('does not reuse stale news for a different limit', async () => {
+    const token = await registerAndLogin();
+
+    await request(app.getHttpServer())
+      .post('/api/onboarding')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...onboardingPayload, coinIds: [1] })
+      .expect(200);
+
+    newsDataClient.fetchNews.mockResolvedValue({
+      status: 'success',
+      totalResults: 1,
+      results: [mockArticle],
+      nextPage: null,
+    });
+
+    await request(app.getHttpServer())
+      .get('/api/news?limit=5')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    await deleteCacheKey(
+      app,
+      buildNewsCacheKey(['BTC'], 3, undefined, 'fresh'),
+    );
+
+    newsDataClient.fetchNews.mockRejectedValue(
+      new GatewayTimeoutException('News request timed out'),
+    );
+
+    const response = await request(app.getHttpServer())
+      .get('/api/news?limit=3')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(504);
+
+    expect((response.body as ErrorResponseBody).statusCode).toBe(504);
+  });
+
+  it('refreshes fresh and stale caches after provider success following stale fallback', async () => {
+    const token = await registerAndLogin();
+
+    await request(app.getHttpServer())
+      .post('/api/onboarding')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...onboardingPayload, coinIds: [1] })
+      .expect(200);
+
+    newsDataClient.fetchNews.mockResolvedValue({
+      status: 'success',
+      totalResults: 1,
+      results: [mockArticle],
+      nextPage: 'next-token',
+    });
+
+    await request(app.getHttpServer())
+      .get('/api/news?limit=5')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    await deleteCacheKey(
+      app,
+      buildNewsCacheKey(['BTC'], 5, undefined, 'fresh'),
+    );
+
+    newsDataClient.fetchNews.mockRejectedValue(
+      new GatewayTimeoutException('News request timed out'),
+    );
+
+    await request(app.getHttpServer())
+      .get('/api/news?limit=5')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    await deleteCacheKey(
+      app,
+      buildNewsCacheKey(['BTC'], 5, undefined, 'fresh'),
+    );
+
+    newsDataClient.fetchNews.mockResolvedValue({
+      status: 'success',
+      totalResults: 1,
+      results: [mockArticle],
+      nextPage: 'refreshed-token',
+    });
+
+    const refreshedResponse = await request(app.getHttpServer())
+      .get('/api/news?limit=5')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect((refreshedResponse.body as NewsListResponse).nextPage).toBe(
+      'refreshed-token',
+    );
   });
 });

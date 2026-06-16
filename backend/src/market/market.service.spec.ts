@@ -77,6 +77,10 @@ describe('MarketService', () => {
                 return 120;
               }
 
+              if (key === 'MARKET_STALE_TTL_SECONDS') {
+                return 1800;
+              }
+
               throw new Error(`Unexpected config key: ${key}`);
             }),
           },
@@ -108,7 +112,7 @@ describe('MarketService', () => {
 
     expect(result).toEqual({ items: [mappedBitcoin] });
     expect(safeCacheService.get).toHaveBeenCalledWith(
-      buildMarketCacheKey(['bitcoin']),
+      buildMarketCacheKey(['bitcoin'], 'fresh'),
     );
     expect(coinGeckoClient.fetchMarkets).not.toHaveBeenCalled();
     expect(safeCacheService.set).not.toHaveBeenCalled();
@@ -140,9 +144,14 @@ describe('MarketService', () => {
 
     expect(coinGeckoClient.fetchMarkets).toHaveBeenCalledWith(['bitcoin']);
     expect(safeCacheService.set).toHaveBeenCalledWith(
-      buildMarketCacheKey(['bitcoin']),
+      buildMarketCacheKey(['bitcoin'], 'fresh'),
       { items: [mappedBitcoin] },
       120,
+    );
+    expect(safeCacheService.set).toHaveBeenCalledWith(
+      buildMarketCacheKey(['bitcoin'], 'stale'),
+      { items: [mappedBitcoin] },
+      1800,
     );
   });
 
@@ -163,11 +172,11 @@ describe('MarketService', () => {
     await marketService.getMarketData(userId);
 
     expect(safeCacheService.get).toHaveBeenCalledWith(
-      buildMarketCacheKey(['bitcoin', 'ethereum']),
+      buildMarketCacheKey(['bitcoin', 'ethereum'], 'fresh'),
     );
   });
 
-  it('does not cache provider errors', async () => {
+  it('does not cache provider errors when no stale entry exists', async () => {
     selectedCoinsService.getSelectedCoins.mockResolvedValue({
       items: [selectedBitcoin],
     });
@@ -179,6 +188,93 @@ describe('MarketService', () => {
       GatewayTimeoutException,
     );
     expect(safeCacheService.set).not.toHaveBeenCalled();
+  });
+
+  it('returns stale data after a provider failure when stale cache exists', async () => {
+    selectedCoinsService.getSelectedCoins.mockResolvedValue({
+      items: [selectedBitcoin],
+    });
+    safeCacheService.get.mockImplementation((key: string) => {
+      if (key === buildMarketCacheKey(['bitcoin'], 'stale')) {
+        return Promise.resolve({ items: [mappedBitcoin] });
+      }
+
+      return Promise.resolve(undefined);
+    });
+    coinGeckoClient.fetchMarkets.mockRejectedValue(
+      new GatewayTimeoutException('Market data provider request timed out'),
+    );
+
+    const result = await marketService.getMarketDataWithMetadata(userId);
+
+    expect(result).toEqual({
+      data: { items: [mappedBitcoin] },
+      isStale: true,
+    });
+    expect(coinGeckoClient.fetchMarkets).toHaveBeenCalled();
+    expect(safeCacheService.set).not.toHaveBeenCalled();
+  });
+
+  it('returns fresh metadata on a cache hit', async () => {
+    selectedCoinsService.getSelectedCoins.mockResolvedValue({
+      items: [selectedBitcoin],
+    });
+    safeCacheService.get.mockResolvedValue({ items: [mappedBitcoin] });
+
+    const result = await marketService.getMarketDataWithMetadata(userId);
+
+    expect(result).toEqual({
+      data: { items: [mappedBitcoin] },
+      isStale: false,
+    });
+  });
+
+  it('caches an empty successful provider response in fresh and stale layers', async () => {
+    selectedCoinsService.getSelectedCoins.mockResolvedValue({
+      items: [selectedBitcoin],
+    });
+    coinGeckoClient.fetchMarkets.mockResolvedValue([]);
+
+    const result = await marketService.getMarketData(userId);
+
+    expect(result).toEqual({ items: [] });
+    expect(safeCacheService.set).toHaveBeenCalledWith(
+      buildMarketCacheKey(['bitcoin'], 'fresh'),
+      { items: [] },
+      120,
+    );
+    expect(safeCacheService.set).toHaveBeenCalledWith(
+      buildMarketCacheKey(['bitcoin'], 'stale'),
+      { items: [] },
+      1800,
+    );
+  });
+
+  it('writes both fresh and stale entries after a successful provider response', async () => {
+    selectedCoinsService.getSelectedCoins.mockResolvedValue({
+      items: [selectedBitcoin],
+    });
+    coinGeckoClient.fetchMarkets.mockResolvedValue([
+      {
+        id: 'bitcoin',
+        symbol: 'btc',
+        name: 'Bitcoin',
+        image: mappedBitcoin.imageUrl,
+        current_price: mappedBitcoin.currentPrice,
+        market_cap: mappedBitcoin.marketCap,
+        market_cap_rank: mappedBitcoin.marketCapRank,
+        total_volume: mappedBitcoin.totalVolume,
+        high_24h: mappedBitcoin.high24h,
+        low_24h: mappedBitcoin.low24h,
+        price_change_24h: mappedBitcoin.priceChange24h,
+        price_change_percentage_24h: mappedBitcoin.changePercentage24h,
+        last_updated: mappedBitcoin.lastUpdated,
+      },
+    ]);
+
+    await marketService.getMarketData(userId);
+
+    expect(safeCacheService.set).toHaveBeenCalledTimes(2);
   });
 
   it('falls back to CoinGecko when cache read returns no value', async () => {

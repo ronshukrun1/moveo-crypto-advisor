@@ -772,3 +772,17 @@ Added `InsightsService.generateFromData()` and `MemesService.generateFromMarketD
 
 **Remaining limitations:** cache is per-process only; no Redis; no manual invalidation endpoints.
 
+---
+
+## Stage 18: Market and News stale fallbacks
+
+**Date:** 2026-06-16
+
+**Summary:** Extended in-process market/news caching with separate fresh and stale (last-known) layers. On fresh miss + provider failure, services return stale mapped data when available. Added `MARKET_STALE_TTL_SECONDS` (default 1800) and `NEWS_STALE_TTL_SECONDS` (default 3600). Dashboard market/news sections expose `isStale` when fallback data is used; standalone `/api/market` and `/api/news` contracts unchanged. Introduced `CachedProviderResult<T>` and `getMarketDataWithMetadata` / `getNewsWithMetadata`.
+
+**Automated verification:** migration show/run (no pending), backend build/lint/unit (192)/E2E (113)/audit (0 vulnerabilities), root build/lint/test — pass.
+
+**Manual verification:** live stale-fallback timing test attempted; E2E suite provides controlled equivalent (fresh-key delete + mocked provider failure). Confirmed: standalone `/api/market` and `/api/news` responses exclude `isStale`; dashboard E2E asserts `market.isStale` / `news.isStale` on fallback.
+
+**Remaining limitations:** stale data is in-memory only; cleared on restart; no Redis or DB persistence for market/news fallback.
+

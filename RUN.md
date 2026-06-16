@@ -51,7 +51,7 @@ Replace placeholder values in `.env.docker` and `backend/.env`. **Never commit**
 | NewsData | `NEWSDATA_BASE_URL`, `NEWSDATA_API_KEY`, `NEWSDATA_TIMEOUT_MS` |
 | OpenRouter | `OPENROUTER_BASE_URL`, `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_TIMEOUT_MS` |
 | Imgflip | `IMGFLIP_BASE_URL`, `IMGFLIP_USERNAME`, `IMGFLIP_PASSWORD`, `IMGFLIP_TEMPLATE_ID`, `IMGFLIP_TIMEOUT_MS` |
-| Cache | `MARKET_CACHE_TTL_SECONDS`, `NEWS_CACHE_TTL_SECONDS` |
+| Cache | `MARKET_CACHE_TTL_SECONDS`, `NEWS_CACHE_TTL_SECONDS`, `MARKET_STALE_TTL_SECONDS`, `NEWS_STALE_TTL_SECONDS` |
 
 ### Port alignment
 
@@ -201,6 +201,19 @@ npm run build
 npm run lint
 npm run test
 ```
+
+### Manual stale-fallback check (optional)
+
+After the backend is running with valid provider credentials:
+
+1. Call `GET /api/market` and `GET /api/news?limit=5` successfully to populate fresh and stale caches.
+2. Wait for fresh TTL expiry, or temporarily lower `MARKET_CACHE_TTL_SECONDS` / `NEWS_CACHE_TTL_SECONDS` locally.
+3. Trigger a controlled provider failure (e.g. invalid timeout simulation in a dev-only setup) **without committing invalid credentials**.
+4. Confirm standalone endpoints still return last-known mapped data (no `isStale` in response).
+5. Confirm `GET /api/dashboard` returns `market.isStale: true` and/or `news.isStale: true` when fallback is used.
+6. Restart the backend and repeat the failure request — stale fallback should be unavailable until a new successful provider response.
+
+Record only status codes, whether stale fallback was used, dashboard `isStale`, restart behavior, and timing. Do not record secrets or raw provider responses. Restore valid local configuration after testing.
 
 ---
 

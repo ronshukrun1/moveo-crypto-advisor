@@ -73,6 +73,13 @@ export class DashboardMarketSectionDto {
   @ApiPropertyOptional({ type: [MarketItemDto] })
   items?: MarketItemDto[];
 
+  @ApiPropertyOptional({
+    example: false,
+    description:
+      'True when last-known cached market data was returned after a provider failure',
+  })
+  isStale?: boolean;
+
   @ApiPropertyOptional({ example: 'Market data is temporarily unavailable' })
   message?: string;
 }
@@ -89,6 +96,13 @@ export class DashboardNewsSectionDto {
 
   @ApiPropertyOptional({ example: null, nullable: true })
   nextPage?: string | null;
+
+  @ApiPropertyOptional({
+    example: false,
+    description:
+      'True when last-known cached news data was returned after a provider failure',
+  })
+  isStale?: boolean;
 
   @ApiPropertyOptional({ example: 'News is temporarily unavailable' })
   message?: string;

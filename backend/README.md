@@ -179,14 +179,25 @@ Existing migrations:
 
 ### In-memory Market and News cache
 
-Mapped market and news responses are cached in-process via `@nestjs/cache-manager` (default TTLs: market **120s**, news **300s** from `MARKET_CACHE_TTL_SECONDS` and `NEWS_CACHE_TTL_SECONDS`).
+Mapped market and news responses are cached in-process via `@nestjs/cache-manager` using two logical layers per resource:
+
+| Layer | Purpose | Default TTL env |
+|-------|---------|-----------------|
+| Fresh | Normal short-lived cache | `MARKET_CACHE_TTL_SECONDS` (**120s**), `NEWS_CACHE_TTL_SECONDS` (**300s**) |
+| Stale (last-known) | Fallback after provider failure | `MARKET_STALE_TTL_SECONDS` (**1800s** / 30 min), `NEWS_STALE_TTL_SECONDS` (**3600s** / 60 min) |
+
+Stale TTL must be **≥** the corresponding fresh TTL (validated at startup).
 
 | Cache | Key basis |
 |-------|-----------|
-| Market | Sorted CoinGecko IDs, fixed `usd` currency — e.g. `market:usd:bitcoin,ethereum` |
-| News | Sorted symbols, `limit`, and page token — e.g. `news:BTC,ETH:limit=5:page=first` |
+| Market | `market:{fresh\|stale}:usd:{sorted-coingecko-ids}` — e.g. `market:fresh:usd:bitcoin,ethereum` |
+| News | `news:{fresh\|stale}:{sorted-symbols}:limit={n}:page={first\|hash}` — e.g. `news:fresh:BTC,ETH:limit=5:page=first` |
 
-Keys are **not** user-specific; the same selected coin set shares cache entries. Provider failures are not cached. Cache read/write failures log a warning and fall back to normal provider calls. The cache is local to one backend process and clears on restart; Redis may be added later for multi-instance deployment.
+**Flow:** fresh hit → return cached data; fresh miss → call provider; on success store in **both** fresh and stale layers; on failure look up stale only (after the provider attempt) and return last-known mapped data if present. Provider errors are never cached. Empty successful responses may be stored. Cache read/write failures log a sanitized warning and fall back to provider calls or return provider data. The cache is local to one backend process and **clears on restart** — after restart, provider failure with no repopulated stale entry preserves existing error behavior.
+
+Keys are **not** user-specific. Only safe mapped internal responses are stored (never raw provider payloads, credentials, or error bodies).
+
+**Dashboard metadata:** when market or news sections are `available` after a stale fallback, `isStale: true` is included. Standalone `GET /api/market` and `GET /api/news` response contracts are unchanged (no `isStale` field).
 
 ---
 
@@ -214,7 +225,7 @@ Each content section returns `available`, `unavailable`, or `disabled`. A failin
 
 | Status | Meaning |
 |--------|---------|
-| `available` | Data loaded successfully |
+| `available` | Data loaded successfully; market/news may include `isStale: true` when last-known cached data was used after a provider failure |
 | `unavailable` | Enabled but failed; safe `message` included |
 | `disabled` | Turned off in preferences; not shown to the user |
 
@@ -254,7 +265,8 @@ See [../RUN.md](../RUN.md) for full quality commands.
 
 ## Current Limitations
 
-- Market and news cache is in-process only (not Redis); cache clears on process restart.
+- Market and news cache is in-process only (not Redis); both fresh and stale layers clear on process restart.
+- Stale fallback is unavailable immediately after restart until a successful provider response repopulates the stale layer.
 - Insight and meme are persisted per user per UTC day; changing investor profile or selected coins invalidates today's stored content.
 - Market and news still call external providers on cache miss.
 - News pages may return fewer than the requested `limit` after relevance filtering; no automatic extra NewsData fetches are made to fill a page.

@@ -31,6 +31,8 @@ describe('validateEnvironment', () => {
     IMGFLIP_TIMEOUT_MS: '5000',
     MARKET_CACHE_TTL_SECONDS: '120',
     NEWS_CACHE_TTL_SECONDS: '300',
+    MARKET_STALE_TTL_SECONDS: '1800',
+    NEWS_STALE_TTL_SECONDS: '3600',
   };
 
   it('accepts a valid configuration', () => {
@@ -66,6 +68,24 @@ describe('validateEnvironment', () => {
         NODE_ENV: 'staging',
       }),
     ).toThrow(/Environment validation failed/);
+  });
+
+  it('rejects market stale TTL below fresh TTL', () => {
+    expect(() =>
+      validateEnvironment({
+        ...validConfig,
+        MARKET_STALE_TTL_SECONDS: '60',
+      }),
+    ).toThrow(/MARKET_STALE_TTL_SECONDS must be greater than or equal/);
+  });
+
+  it('rejects news stale TTL below fresh TTL', () => {
+    expect(() =>
+      validateEnvironment({
+        ...validConfig,
+        NEWS_STALE_TTL_SECONDS: '60',
+      }),
+    ).toThrow(/NEWS_STALE_TTL_SECONDS must be greater than or equal/);
   });
 
   it('does not include secret values in validation errors', () => {

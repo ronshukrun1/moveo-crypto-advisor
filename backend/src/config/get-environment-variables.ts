@@ -47,5 +47,11 @@ export function getEnvironmentVariables(
     NEWS_CACHE_TTL_SECONDS: configService.getOrThrow<number>(
       'NEWS_CACHE_TTL_SECONDS',
     ),
+    MARKET_STALE_TTL_SECONDS: configService.getOrThrow<number>(
+      'MARKET_STALE_TTL_SECONDS',
+    ),
+    NEWS_STALE_TTL_SECONDS: configService.getOrThrow<number>(
+      'NEWS_STALE_TTL_SECONDS',
+    ),
   };
 }

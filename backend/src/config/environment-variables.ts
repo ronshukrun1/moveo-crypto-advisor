@@ -128,4 +128,14 @@ export class EnvironmentVariables {
   @IsInt()
   @Min(1)
   NEWS_CACHE_TTL_SECONDS: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  MARKET_STALE_TTL_SECONDS: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  NEWS_STALE_TTL_SECONDS: number;
 }
