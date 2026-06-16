@@ -50,7 +50,7 @@ Replace placeholder values in `.env.docker` and `backend/.env`. **Never commit**
 | CoinGecko | `COINGECKO_BASE_URL`, `COINGECKO_API_KEY`, `COINGECKO_TIMEOUT_MS` |
 | NewsData | `NEWSDATA_BASE_URL`, `NEWSDATA_API_KEY`, `NEWSDATA_TIMEOUT_MS` |
 | OpenRouter | `OPENROUTER_BASE_URL`, `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_TIMEOUT_MS` |
-| Imgflip | `IMGFLIP_BASE_URL`, `IMGFLIP_USERNAME`, `IMGFLIP_PASSWORD`, `IMGFLIP_TEMPLATE_ID`, `IMGFLIP_TIMEOUT_MS` |
+| Imgflip | `IMGFLIP_BASE_URL`, `IMGFLIP_USERNAME`, `IMGFLIP_PASSWORD`, `IMGFLIP_TEMPLATE_IDS`, `IMGFLIP_TIMEOUT_MS` |
 | Cache | `MARKET_CACHE_TTL_SECONDS`, `NEWS_CACHE_TTL_SECONDS`, `MARKET_STALE_TTL_SECONDS`, `NEWS_STALE_TTL_SECONDS` |
 
 ### Port alignment
@@ -160,6 +160,8 @@ Default Vite URL: http://localhost:5173 (must match `FRONTEND_URL` in `backend/.
 
 After login, users with `onboardingCompleted=false` are redirected to `/onboarding` to complete the three-step setup (`GET /api/coins`, then `POST /api/onboarding`). Incomplete step state is kept in memory only and resets on page refresh before submission.
 
+Completed users land on `/dashboard`, which loads **`GET /api/dashboard` only** (four sections: news, market, insight, meme). Use the page refresh control to re-fetch the full dashboard. Onboarding-completed users can edit settings at **`/preferences`**, which loads `GET /api/preferences`, `GET /api/selected-coins`, and `GET /api/coins`, then saves via separate `PATCH /api/preferences` and/or `PUT /api/selected-coins` calls only for changed sections.
+
 Copy `frontend/.env.example` to `frontend/.env` before starting. If `VITE_API_BASE_URL` is missing or wrong, the app fails at startup or the API status indicator shows **unavailable**.
 
 ### Start both from root
@@ -202,7 +204,7 @@ npm run test:e2e
 npm audit
 ```
 
-E2E tests require Docker PostgreSQL to be running with migrations applied. External APIs are mocked in tests.
+E2E tests require Docker PostgreSQL to be running. They use a **separate database** (`moveo_crypto_advisor_test`) so development users are not deleted. The test database is created and migrated automatically before E2E runs. External APIs are mocked in tests.
 
 ### Full project (from repository root)
 
@@ -234,7 +236,7 @@ Record only status codes, whether stale fallback was used, dashboard `isStale`, 
 | Backend fails at startup with environment validation errors | Missing or invalid `.env` values | Compare `backend/.env` with `backend/.env.example` |
 | Database connection refused | PostgreSQL not running or wrong port | `docker compose ps`; align `DB_PORT` and `POSTGRES_PORT` |
 | Migrations fail | Database not ready or wrong credentials | Restart Docker; verify `.env.docker` matches `backend/.env` DB settings |
-| E2E tests fail | Migrations not applied or Docker down | `npm run migration:run`; `docker compose up -d` |
+| E2E tests fail | Docker down or test DB not reachable | `docker compose up -d`; re-run `npm run test:e2e` (creates/migrates `moveo_crypto_advisor_test` automatically) |
 | `409` on `/api/dashboard` | Onboarding not completed | `POST /api/onboarding` first |
 | `502` / `503` / `504` on content routes | External API key, rate limit, or timeout | Verify provider credentials in `backend/.env` |
 | CORS errors from browser | `FRONTEND_URL` mismatch | Set `FRONTEND_URL` to the actual frontend origin (e.g. `http://localhost:5173`) |

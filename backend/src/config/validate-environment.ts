@@ -1,5 +1,6 @@
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
+import { parseImgflipTemplateIds } from './imgflip-template-ids.utils';
 import { EnvironmentVariables } from './environment-variables';
 
 export function validateEnvironment(
@@ -37,6 +38,15 @@ export function validateEnvironment(
     throw new Error(
       'Environment validation failed: NEWS_STALE_TTL_SECONDS must be greater than or equal to NEWS_CACHE_TTL_SECONDS',
     );
+  }
+
+  try {
+    parseImgflipTemplateIds(validatedConfig.IMGFLIP_TEMPLATE_IDS);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Invalid IMGFLIP_TEMPLATE_IDS';
+
+    throw new Error(`Environment validation failed: ${message}`);
   }
 
   return validatedConfig;

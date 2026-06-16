@@ -12,16 +12,18 @@ import { User } from '../../users/entities/user.entity';
 
 export interface MemeSourceDataSnapshot {
   templateId: number;
+  captionVariationId: string;
+  investorProfile: string;
   selectedCoins: Array<{
     id: number;
     symbol: string;
     name: string;
   }>;
-  marketFacts: Array<{
+  selectedMarketItem: {
     symbol: string;
     name: string;
     changePercentage24h: number | null;
-  }>;
+  };
 }
 
 @Entity('daily_memes')

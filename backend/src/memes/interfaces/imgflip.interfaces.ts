@@ -1,4 +1,5 @@
 export interface CaptionImageParams {
+  templateId: number;
   text0: string;
   text1: string;
 }

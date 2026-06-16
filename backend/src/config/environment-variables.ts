@@ -109,10 +109,9 @@ export class EnvironmentVariables {
   @IsNotEmpty()
   IMGFLIP_PASSWORD: string;
 
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  IMGFLIP_TEMPLATE_ID: number;
+  @IsString()
+  @IsNotEmpty()
+  IMGFLIP_TEMPLATE_IDS: string;
 
   @Type(() => Number)
   @IsInt()

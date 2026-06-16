@@ -3,6 +3,7 @@ import { HttpModule } from '@nestjs/axios';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { MarketModule } from '../market/market.module';
+import { PreferencesModule } from '../preferences/preferences.module';
 import { SelectedCoinsModule } from '../selected-coins/selected-coins.module';
 import { DailyMeme } from './entities/daily-meme.entity';
 import { ImgflipClient } from './imgflip.client';
@@ -14,6 +15,7 @@ import { MemesService } from './memes.service';
     HttpModule,
     TypeOrmModule.forFeature([DailyMeme]),
     AuthModule,
+    PreferencesModule,
     SelectedCoinsModule,
     MarketModule,
   ],

@@ -11,12 +11,15 @@ import { renderWithProviders } from '../test/test-utils';
 import * as authApi from '../api/auth';
 import * as coinsApi from '../api/coins';
 import * as onboardingApi from '../api/onboarding';
+import * as dashboardApi from '../api/dashboard';
 import { setStoredToken, clearStoredToken } from '../auth/auth-storage';
 import { ApiError } from '../api/api-error';
+import { mockDashboardResponse } from '../dashboard/dashboard.fixtures';
 
 vi.mock('../api/auth');
 vi.mock('../api/coins');
 vi.mock('../api/onboarding');
+vi.mock('../api/dashboard');
 
 const incompleteUser = {
   id: 1,
@@ -75,6 +78,7 @@ describe('onboarding flow', () => {
     setStoredToken('token-incomplete');
     vi.mocked(authApi.getCurrentUser).mockResolvedValue(incompleteUser);
     vi.mocked(coinsApi.getSupportedCoins).mockResolvedValue(mockCoins);
+    vi.mocked(dashboardApi.getDashboard).mockResolvedValue(mockDashboardResponse);
   });
 
   it('loads coins from GET /api/coins', async () => {
@@ -310,7 +314,7 @@ describe('onboarding flow', () => {
       expect(authApi.getCurrentUser).toHaveBeenCalledTimes(2);
     });
 
-    expect(await screen.findByText(/Signed in as Ron/i)).toBeInTheDocument();
+    expect(await screen.findByText('Ron')).toBeInTheDocument();
   });
 
   it('shows safe validation message on backend 400', async () => {
@@ -347,7 +351,7 @@ describe('onboarding flow', () => {
       routerProps: { initialEntries: ['/onboarding'] },
     });
 
-    expect(await screen.findByText(/Signed in as Ron/i)).toBeInTheDocument();
+    expect(await screen.findByText('Ron')).toBeInTheDocument();
     expect(screen.queryByText('Investor profile')).not.toBeInTheDocument();
   });
 

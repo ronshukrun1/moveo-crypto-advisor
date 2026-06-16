@@ -20,6 +20,7 @@ export class ApiError extends Error {
 interface BackendErrorBody {
   message?: string | string[];
   statusCode?: number;
+  details?: string[];
 }
 
 function extractValidationMessages(message: string | string[] | undefined): string[] | undefined {
@@ -47,7 +48,8 @@ export function normalizeApiError(error: unknown): ApiError {
 
     const statusCode = axiosError.response?.status;
     const body = axiosError.response?.data;
-    const validationMessages = extractValidationMessages(body?.message);
+    const validationMessages =
+      body?.details ?? extractValidationMessages(body?.message);
 
     if (statusCode === 401) {
       return new ApiError('Your session has expired. Please sign in again.', {
@@ -67,6 +69,14 @@ export function normalizeApiError(error: unknown): ApiError {
 
     if (statusCode === 404) {
       return new ApiError('The requested resource was not found.', {
+        statusCode,
+        validationMessages,
+        cause: error,
+      });
+    }
+
+    if (statusCode === 409) {
+      return new ApiError('Complete onboarding before accessing the dashboard.', {
         statusCode,
         validationMessages,
         cause: error,

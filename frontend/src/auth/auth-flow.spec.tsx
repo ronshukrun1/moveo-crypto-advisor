@@ -13,11 +13,14 @@ import { OnboardingOnlyRoute } from '../auth/OnboardingOnlyRoute';
 import { renderWithProviders } from '../test/test-utils';
 import * as authApi from '../api/auth';
 import * as coinsApi from '../api/coins';
+import * as dashboardApi from '../api/dashboard';
 import { setStoredToken, clearStoredToken } from '../auth/auth-storage';
 import { ApiError } from '../api/api-error';
+import { mockDashboardResponse } from '../dashboard/dashboard.fixtures';
 
 vi.mock('../api/auth');
 vi.mock('../api/coins');
+vi.mock('../api/dashboard');
 
 const incompleteUser = {
   id: 1,
@@ -61,6 +64,7 @@ describe('authentication flows', () => {
     vi.mocked(coinsApi.getSupportedCoins).mockResolvedValue({
       items: [{ id: 1, coingeckoId: 'bitcoin', symbol: 'btc', name: 'Bitcoin' }],
     });
+    vi.mocked(dashboardApi.getDashboard).mockResolvedValue(mockDashboardResponse);
   });
 
   it('register form includes name, email, password, and confirm password fields', () => {
@@ -171,7 +175,7 @@ describe('authentication flows', () => {
     await user.type(screen.getByLabelText('Password'), 'StrongPass123!');
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
 
-    expect(await screen.findByText(/Signed in as Alex/i)).toBeInTheDocument();
+    expect(await screen.findByText('Alex')).toBeInTheDocument();
   });
 
   it('loads current user when an existing token is present', async () => {
@@ -180,7 +184,7 @@ describe('authentication flows', () => {
 
     renderWithProviders(<AuthRoutes />, { routerProps: { initialEntries: ['/dashboard'] } });
 
-    expect(await screen.findByText(/Signed in as Alex/i)).toBeInTheDocument();
+    expect(await screen.findByText('Alex')).toBeInTheDocument();
     expect(authApi.getCurrentUser).toHaveBeenCalled();
   });
 
@@ -208,7 +212,7 @@ describe('authentication flows', () => {
 
     renderWithProviders(<AuthRoutes />, { routerProps: { initialEntries: ['/onboarding'] } });
 
-    expect(await screen.findByText(/Signed in as Alex/i)).toBeInTheDocument();
+    expect(await screen.findByText('Alex')).toBeInTheDocument();
   });
 
   it('logout clears token and returns to login', async () => {
@@ -218,7 +222,7 @@ describe('authentication flows', () => {
 
     renderWithProviders(<AuthRoutes />, { routerProps: { initialEntries: ['/dashboard'] } });
 
-    await screen.findByText(/Signed in as Alex/i);
+    await screen.findByText('Alex');
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
 
     expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument();

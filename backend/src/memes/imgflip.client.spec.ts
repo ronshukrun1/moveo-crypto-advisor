@@ -15,7 +15,8 @@ describe('ImgflipClient', () => {
   let httpService: { post: jest.Mock };
 
   const captions = {
-    text0: 'BTC moved 2.2% in 24 hours',
+    templateId: 181913649,
+    text0: 'BTC moved +2.2% in 24 hours',
     text1: 'Me checking the dashboard again',
   };
 
@@ -47,7 +48,6 @@ describe('ImgflipClient', () => {
                 IMGFLIP_BASE_URL: 'https://api.imgflip.com',
                 IMGFLIP_USERNAME: 'test-imgflip-username',
                 IMGFLIP_PASSWORD: 'test-imgflip-password',
-                IMGFLIP_TEMPLATE_ID: 181913649,
                 IMGFLIP_TIMEOUT_MS: 5000,
               };
 
@@ -72,7 +72,7 @@ describe('ImgflipClient', () => {
     });
     expect(httpService.post).toHaveBeenCalledWith(
       'https://api.imgflip.com/caption_image',
-      'template_id=181913649&username=test-imgflip-username&password=test-imgflip-password&text0=BTC+moved+2.2%25+in+24+hours&text1=Me+checking+the+dashboard+again',
+      'template_id=181913649&username=test-imgflip-username&password=test-imgflip-password&text0=BTC+moved+%2B2.2%25+in+24+hours&text1=Me+checking+the+dashboard+again',
       {
         timeout: 5000,
         headers: {

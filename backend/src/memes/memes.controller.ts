@@ -25,9 +25,9 @@ export class MemesController {
 
   @Get('daily')
   @ApiOperation({
-    summary: 'Generate a personalized cryptocurrency meme',
+    summary: 'Get the authenticated user personalized daily meme',
     description:
-      'Generates a light cryptocurrency meme for the authenticated user based on selected coins and current market data. Persistence and true once-per-day reuse are not implemented yet, so each call generates a new meme.',
+      'Returns the persisted meme for the authenticated user and current UTC calendar date. Same-day requests reuse stored content without calling Imgflip again.',
   })
   @ApiOkResponse({
     description: 'Generated meme mapped to the internal response shape',

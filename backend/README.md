@@ -173,7 +173,12 @@ Existing migrations:
 
 - The first request of the day generates content, stores a safe JSONB snapshot and context hash, and returns the public response.
 - Later same-day requests with a matching context hash return the stored row without calling OpenRouter or Imgflip.
-- The context hash includes investor profile and selected coin IDs for insights, and selected coin IDs plus the configured Imgflip template ID for memes. Changing those values invalidates today's stored row and triggers regeneration.
+- The context hash includes investor profile and selected coin IDs for insights. For memes it includes user ID, investor profile, sorted selected coin IDs, and the configured template pool version. Changing those values invalidates today's stored row and triggers regeneration.
+- Meme template and caption style are chosen deterministically from `userId`, UTC date, investor profile, sorted selected coin IDs, and the configured template pool version (`IMGFLIP_TEMPLATE_IDS`). Template and caption family are selected independently so the same template can appear with different text on non-consecutive days.
+- Daily memes vary by user, UTC date, investor profile, selected coins, and 24-hour market movement direction. Captions use only supplied facts (coin symbol/name, formatted change, profile tone) and avoid financial recommendation language.
+- Consecutive UTC days avoid repeating the same template or caption variation when the pool offers alternatives, using the previous day's persisted meme as input.
+- If the selected Imgflip template fails, the service retries once with the next deterministic template in the approved pool.
+- Same user and UTC day reuse the stored meme; a new UTC day or different user usually receives a different variation. No random generation occurs on refresh.
 - `generatedAt` in API responses comes from the stored row timestamp (`updatedAt`).
 - Concurrent requests use PostgreSQL unique constraints plus upsert so at most one row exists per user per UTC day; generation happens outside the database transaction, then a short atomic upsert persists the result.
 
@@ -257,7 +262,7 @@ Click **Authorize**, then paste the **raw JWT** (`accessToken` from login). Swag
 ## Testing
 
 - **Unit tests** — `npm test` (mocks external HTTP and dependencies).
-- **E2E tests** — `npm run test:e2e` (full `AppModule`, Docker PostgreSQL, mocked external clients).
+- **E2E tests** — `npm run test:e2e` (full `AppModule`, isolated PostgreSQL database `moveo_crypto_advisor_test`, mocked external clients).
 
 See [../RUN.md](../RUN.md) for full quality commands.
 

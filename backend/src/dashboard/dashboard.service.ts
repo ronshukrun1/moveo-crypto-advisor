@@ -1,4 +1,5 @@
 import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import { getUtcDateString } from '../common/utils/daily-content.utils';
 import { DailyInsightResponseDto } from '../insights/dto/daily-insight-response.dto';
 import { InsightsService } from '../insights/insights.service';
 import { MarketService } from '../market/market.service';
@@ -92,6 +93,7 @@ export class DashboardService {
       ),
       this.buildMemeSection(
         preferences.showMeme,
+        preferences.investorProfile,
         selectedCoins,
         sharedMarket,
         storedMeme,
@@ -258,6 +260,7 @@ export class DashboardService {
 
   private async buildMemeSection(
     isEnabled: boolean,
+    investorProfile: DashboardResponseDto['preferences']['investorProfile'],
     selectedCoins: DashboardResponseDto['selectedCoins'],
     sharedMarket: SharedMarketDataResult | null,
     storedMeme: DailyMemeResponseDto | null,
@@ -286,6 +289,9 @@ export class DashboardService {
       const data = await this.memesService.generateAndPersistFromMarketData(
         userId,
         {
+          userId,
+          investorProfile,
+          generatedForDate: getUtcDateString(),
           selectedCoins,
           marketItems: sharedMarket.items,
         },

@@ -11,10 +11,23 @@ import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
 import { configureApplication } from '../src/app.setup';
+import * as dailyContentUtils from '../src/common/utils/daily-content.utils';
+import {
+  parseImgflipTemplateIds,
+  buildTemplatePoolVersion,
+} from '../src/config/imgflip-template-ids.utils';
 import { CoinGeckoClient } from '../src/market/coin-gecko.client';
 import { DailyMeme } from '../src/memes/entities/daily-meme.entity';
 import { ImgflipClient } from '../src/memes/imgflip.client';
+import {
+  getEligibleCaptionVariationIds,
+  getMovementCategory,
+  selectMostVolatileMarketItem,
+} from '../src/memes/utils/meme-caption.builder';
+import { buildCaptionsForSnapshot } from '../src/memes/utils/meme-snapshot.builder';
+import { selectMemeVariation } from '../src/memes/utils/meme-variation.utils';
 import { InvestorProfile } from '../src/preferences/enums/investor-profile.enum';
+import { User } from '../src/users/entities/user.entity';
 
 interface DailyMemeResponse {
   imageUrl: string;
@@ -49,26 +62,72 @@ const mockMarketItem = {
   last_updated: '2026-06-15T06:11:30.617Z',
 };
 
+const onboardingPayload = {
+  investorProfile: InvestorProfile.LONG_TERM_HOLDER,
+  showMarketPrices: true,
+  showNews: true,
+  showAiInsight: true,
+  showMeme: true,
+  coinIds: [1, 2],
+};
+
+function getTemplateIds(): number[] {
+  return parseImgflipTemplateIds(process.env.IMGFLIP_TEMPLATE_IDS ?? '');
+}
+
+function buildExpectedVariation(userId: number, generatedForDate: string) {
+  const templateIds = getTemplateIds();
+  const marketItems = [
+    {
+      symbol: 'BTC',
+      name: 'Bitcoin',
+      changePercentage24h: 2.17,
+    },
+    {
+      symbol: 'ETH',
+      name: 'Ethereum',
+      changePercentage24h: -5.1,
+    },
+  ];
+  const movement = getMovementCategory(
+    selectMostVolatileMarketItem(marketItems).changePercentage24h,
+  );
+  const eligibleCaptionVariationIds = getEligibleCaptionVariationIds(
+    movement,
+    onboardingPayload.investorProfile,
+  );
+  const variation = selectMemeVariation({
+    userId,
+    generatedForDate,
+    investorProfile: onboardingPayload.investorProfile,
+    selectedCoinIds: onboardingPayload.coinIds,
+    templateIds,
+    eligibleCaptionVariationIds,
+    previousDayMeme: null,
+  });
+  const captions = buildCaptionsForSnapshot(
+    {
+      userId,
+      investorProfile: onboardingPayload.investorProfile,
+      generatedForDate,
+      selectedCoins: [
+        { id: 1, symbol: 'BTC', name: 'Bitcoin' },
+        { id: 2, symbol: 'ETH', name: 'Ethereum' },
+      ],
+      marketItems,
+    },
+    variation.captionVariationId,
+  );
+
+  return { variation, captions };
+}
+
 describe('Memes (e2e)', () => {
   let app: INestApplication<App>;
   let dataSource: DataSource;
   let coinGeckoClient: { fetchMarkets: jest.Mock };
   let imgflipClient: { captionImage: jest.Mock };
-
-  const registerPayload = {
-    name: 'Ron',
-    email: 'memes-user@example.com',
-    password: 'StrongPass123!',
-  };
-
-  const onboardingPayload = {
-    investorProfile: InvestorProfile.LONG_TERM_HOLDER,
-    showMarketPrices: true,
-    showNews: true,
-    showAiInsight: true,
-    showMeme: true,
-    coinIds: [1, 2],
-  };
+  let currentUtcDate = '2026-06-16';
 
   beforeAll(async () => {
     coinGeckoClient = { fetchMarkets: jest.fn() };
@@ -91,6 +150,11 @@ describe('Memes (e2e)', () => {
   });
 
   beforeEach(async () => {
+    currentUtcDate = '2026-06-16';
+    jest
+      .spyOn(dailyContentUtils, 'getUtcDateString')
+      .mockImplementation(() => currentUtcDate);
+
     coinGeckoClient.fetchMarkets.mockReset();
     imgflipClient.captionImage.mockReset();
 
@@ -102,20 +166,28 @@ describe('Memes (e2e)', () => {
   });
 
   afterAll(async () => {
+    jest.restoreAllMocks();
     await app.close();
   });
 
-  async function registerAndLogin(): Promise<string> {
+  async function registerAndLogin(
+    email: string,
+    name: string,
+  ): Promise<string> {
     await request(app.getHttpServer())
       .post('/api/auth/register')
-      .send(registerPayload)
+      .send({
+        name,
+        email,
+        password: 'StrongPass123!',
+      })
       .expect(201);
 
     const loginResponse = await request(app.getHttpServer())
       .post('/api/auth/login')
       .send({
-        email: registerPayload.email,
-        password: registerPayload.password,
+        email,
+        password: 'StrongPass123!',
       })
       .expect(200);
 
@@ -141,10 +213,12 @@ describe('Memes (e2e)', () => {
         price_change_percentage_24h: -5.1,
       },
     ]);
-    imgflipClient.captionImage.mockResolvedValue({
-      url: 'https://i.imgflip.com/example.jpg',
-      pageUrl: 'https://imgflip.com/i/example',
-    });
+    imgflipClient.captionImage.mockImplementation(
+      (params: { templateId: number; text0: string; text1: string }) => ({
+        url: `https://i.imgflip.com/${params.templateId}.jpg`,
+        pageUrl: `https://imgflip.com/i/${params.templateId}`,
+      }),
+    );
   }
 
   it('GET /api/memes/daily without token returns 401', async () => {
@@ -156,7 +230,7 @@ describe('Memes (e2e)', () => {
   });
 
   it('returns 400 when the user has no selected coins', async () => {
-    const token = await registerAndLogin();
+    const token = await registerAndLogin('memes-user@example.com', 'Ron');
 
     const response = await request(app.getHttpServer())
       .get('/api/memes/daily')
@@ -170,9 +244,17 @@ describe('Memes (e2e)', () => {
   });
 
   it('returns a mapped meme for an authenticated onboarded user', async () => {
-    const token = await registerAndLogin();
+    const token = await registerAndLogin('memes-user@example.com', 'Ron');
     await onboardUser(token);
     mockExternalDependencies();
+
+    const user = await dataSource.getRepository(User).findOneByOrFail({
+      email: 'memes-user@example.com',
+    });
+    const { variation, captions } = buildExpectedVariation(
+      user.id,
+      currentUtcDate,
+    );
 
     const response = await request(app.getHttpServer())
       .get('/api/memes/daily')
@@ -180,16 +262,22 @@ describe('Memes (e2e)', () => {
       .expect(200);
 
     const body = response.body as DailyMemeResponse;
-    expect(body.imageUrl).toBe('https://i.imgflip.com/example.jpg');
-    expect(body.pageUrl).toBe('https://imgflip.com/i/example');
-    expect(body.textTop).toBe('ETH moved -5.1% in 24 hours');
-    expect(body.textBottom).toBe('Me checking the dashboard again');
+    expect(body.imageUrl).toBe(
+      `https://i.imgflip.com/${variation.templateId}.jpg`,
+    );
+    expect(body.pageUrl).toBe(`https://imgflip.com/i/${variation.templateId}`);
+    expect(body.textTop).toBe(captions.textTop);
+    expect(body.textBottom).toBe(captions.textBottom);
     expect(body.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-    expect(imgflipClient.captionImage).toHaveBeenCalled();
+    expect(imgflipClient.captionImage).toHaveBeenCalledWith({
+      templateId: variation.templateId,
+      text0: captions.textTop,
+      text1: captions.textBottom,
+    });
   });
 
   it('returns the same stored meme on a second same-day request', async () => {
-    const token = await registerAndLogin();
+    const token = await registerAndLogin('memes-user@example.com', 'Ron');
     await onboardUser(token);
     mockExternalDependencies();
 
@@ -208,12 +296,113 @@ describe('Memes (e2e)', () => {
     expect(secondResponse.body).toEqual(firstResponse.body);
     expect(imgflipClient.captionImage).not.toHaveBeenCalled();
     expect(coinGeckoClient.fetchMarkets).not.toHaveBeenCalled();
-
     expect(await dataSource.getRepository(DailyMeme).count()).toBe(1);
   });
 
-  it('does not expose credentials or raw Imgflip fields', async () => {
-    const token = await registerAndLogin();
+  it('creates separate daily meme rows for two users with identical selected coins', async () => {
+    const tokenA = await registerAndLogin('meme-user-a@example.com', 'User A');
+    const tokenB = await registerAndLogin('meme-user-b@example.com', 'User B');
+    await onboardUser(tokenA);
+    await onboardUser(tokenB);
+    mockExternalDependencies();
+
+    await request(app.getHttpServer())
+      .get('/api/memes/daily')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .expect(200);
+    await request(app.getHttpServer())
+      .get('/api/memes/daily')
+      .set('Authorization', `Bearer ${tokenB}`)
+      .expect(200);
+
+    const rows = await dataSource.getRepository(DailyMeme).find();
+    expect(rows).toHaveLength(2);
+    expect(
+      rows[0].templateId !== rows[1].templateId ||
+        rows[0].textTop !== rows[1].textTop ||
+        rows[0].textBottom !== rows[1].textBottom,
+    ).toBe(true);
+  });
+
+  it('returns a new daily meme on the next UTC date', async () => {
+    const token = await registerAndLogin('memes-user@example.com', 'Ron');
+    await onboardUser(token);
+    mockExternalDependencies();
+
+    const firstResponse = await request(app.getHttpServer())
+      .get('/api/memes/daily')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    currentUtcDate = '2026-06-17';
+    imgflipClient.captionImage.mockClear();
+
+    const secondResponse = await request(app.getHttpServer())
+      .get('/api/memes/daily')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(secondResponse.body).not.toEqual(firstResponse.body);
+    expect(imgflipClient.captionImage).toHaveBeenCalledTimes(1);
+    expect(await dataSource.getRepository(DailyMeme).count()).toBe(2);
+  });
+
+  it('regenerates today meme when selected coins change', async () => {
+    const token = await registerAndLogin('memes-user@example.com', 'Ron');
+    await onboardUser(token);
+    mockExternalDependencies();
+
+    const firstResponse = await request(app.getHttpServer())
+      .get('/api/memes/daily')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .put('/api/selected-coins')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ coinIds: [1] })
+      .expect(200);
+
+    imgflipClient.captionImage.mockClear();
+
+    const secondResponse = await request(app.getHttpServer())
+      .get('/api/memes/daily')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(secondResponse.body).not.toEqual(firstResponse.body);
+    expect(imgflipClient.captionImage).toHaveBeenCalledTimes(1);
+  });
+
+  it('regenerates today meme when investor profile changes', async () => {
+    const token = await registerAndLogin('memes-user@example.com', 'Ron');
+    await onboardUser(token);
+    mockExternalDependencies();
+
+    const firstResponse = await request(app.getHttpServer())
+      .get('/api/memes/daily')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .patch('/api/preferences')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ investorProfile: InvestorProfile.BEGINNER })
+      .expect(200);
+
+    imgflipClient.captionImage.mockClear();
+
+    const secondResponse = await request(app.getHttpServer())
+      .get('/api/memes/daily')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(secondResponse.body).not.toEqual(firstResponse.body);
+    expect(imgflipClient.captionImage).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not expose credentials, hashes, or template pool metadata', async () => {
+    const token = await registerAndLogin('memes-user@example.com', 'Ron');
     await onboardUser(token);
     mockExternalDependencies();
 
@@ -230,10 +419,15 @@ describe('Memes (e2e)', () => {
     expect(serialized).not.toContain('test-imgflip-password');
     expect(serialized).not.toContain('sourceDataSnapshot');
     expect(serialized).not.toContain('contextHash');
+    expect(serialized).not.toContain('captionVariationId');
+    expect(serialized).not.toContain('templateId');
+    expect(serialized).not.toContain(
+      buildTemplatePoolVersion(getTemplateIds()),
+    );
   });
 
   it('rejects unknown query fields such as userId', async () => {
-    const token = await registerAndLogin();
+    const token = await registerAndLogin('memes-user@example.com', 'Ron');
 
     const response = await request(app.getHttpServer())
       .get('/api/memes/daily?userId=999')
@@ -244,7 +438,7 @@ describe('Memes (e2e)', () => {
   });
 
   it('returns 502 when Imgflip reports success=false', async () => {
-    const token = await registerAndLogin();
+    const token = await registerAndLogin('memes-user@example.com', 'Ron');
     await onboardUser(token);
     mockExternalDependencies();
     imgflipClient.captionImage.mockRejectedValue(
@@ -259,26 +453,8 @@ describe('Memes (e2e)', () => {
     expect((response.body as ErrorResponseBody).statusCode).toBe(502);
   });
 
-  it('returns 502 for invalid template failures', async () => {
-    const token = await registerAndLogin();
-    await onboardUser(token);
-    mockExternalDependencies();
-    imgflipClient.captionImage.mockRejectedValue(
-      new BadGatewayException('Unable to generate meme'),
-    );
-
-    const response = await request(app.getHttpServer())
-      .get('/api/memes/daily')
-      .set('Authorization', `Bearer ${token}`)
-      .expect(502);
-
-    expect((response.body as ErrorResponseBody).message).toBe(
-      'Unable to generate meme',
-    );
-  });
-
   it('returns 504 when Imgflip times out', async () => {
-    const token = await registerAndLogin();
+    const token = await registerAndLogin('memes-user@example.com', 'Ron');
     await onboardUser(token);
     mockExternalDependencies();
     imgflipClient.captionImage.mockRejectedValue(
@@ -294,7 +470,7 @@ describe('Memes (e2e)', () => {
   });
 
   it('returns 503 when Imgflip is rate limited', async () => {
-    const token = await registerAndLogin();
+    const token = await registerAndLogin('memes-user@example.com', 'Ron');
     await onboardUser(token);
     mockExternalDependencies();
     imgflipClient.captionImage.mockRejectedValue(
@@ -312,7 +488,7 @@ describe('Memes (e2e)', () => {
   });
 
   it('returns captions without investment recommendations', async () => {
-    const token = await registerAndLogin();
+    const token = await registerAndLogin('memes-user@example.com', 'Ron');
     await onboardUser(token);
     mockExternalDependencies();
 

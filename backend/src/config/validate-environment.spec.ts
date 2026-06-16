@@ -27,7 +27,8 @@ describe('validateEnvironment', () => {
     IMGFLIP_BASE_URL: 'https://api.imgflip.com',
     IMGFLIP_USERNAME: 'test-imgflip-username',
     IMGFLIP_PASSWORD: 'test-imgflip-password',
-    IMGFLIP_TEMPLATE_ID: '181913649',
+    IMGFLIP_TEMPLATE_IDS:
+      '87743020,102156234,112126428,124822590,129242436,181913649,188390779,217743513,438680,61520,61579',
     IMGFLIP_TIMEOUT_MS: '5000',
     MARKET_CACHE_TTL_SECONDS: '120',
     NEWS_CACHE_TTL_SECONDS: '300',
@@ -86,6 +87,24 @@ describe('validateEnvironment', () => {
         NEWS_STALE_TTL_SECONDS: '60',
       }),
     ).toThrow(/NEWS_STALE_TTL_SECONDS must be greater than or equal/);
+  });
+
+  it('rejects a single Imgflip template ID', () => {
+    expect(() =>
+      validateEnvironment({
+        ...validConfig,
+        IMGFLIP_TEMPLATE_IDS: '181913649',
+      }),
+    ).toThrow(/at least two/i);
+  });
+
+  it('rejects invalid Imgflip template list values', () => {
+    expect(() =>
+      validateEnvironment({
+        ...validConfig,
+        IMGFLIP_TEMPLATE_IDS: '181913649,abc,87743020',
+      }),
+    ).toThrow(/positive numeric/i);
   });
 
   it('does not include secret values in validation errors', () => {

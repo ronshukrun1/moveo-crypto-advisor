@@ -29,9 +29,6 @@ export class ImgflipClient {
     const baseUrl = this.configService.getOrThrow<string>('IMGFLIP_BASE_URL');
     const username = this.configService.getOrThrow<string>('IMGFLIP_USERNAME');
     const password = this.configService.getOrThrow<string>('IMGFLIP_PASSWORD');
-    const templateId = this.configService.getOrThrow<number>(
-      'IMGFLIP_TEMPLATE_ID',
-    );
     const timeoutMs =
       this.configService.getOrThrow<number>('IMGFLIP_TIMEOUT_MS');
 
@@ -41,7 +38,7 @@ export class ImgflipClient {
     ).toString();
 
     const formBody = new URLSearchParams({
-      template_id: String(templateId),
+      template_id: String(params.templateId),
       username,
       password,
       text0: params.text0,

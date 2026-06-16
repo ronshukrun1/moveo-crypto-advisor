@@ -210,10 +210,13 @@ describe('DashboardService', () => {
     );
     expect(memesService.generateAndPersistFromMarketData).toHaveBeenCalledWith(
       userId,
-      {
+      expect.objectContaining({
+        userId,
+        investorProfile: InvestorProfile.LONG_TERM_HOLDER,
         selectedCoins: selectedCoins.items,
         marketItems: marketData.items,
-      },
+        generatedForDate: expect.any(String) as string,
+      }),
     );
   });
 

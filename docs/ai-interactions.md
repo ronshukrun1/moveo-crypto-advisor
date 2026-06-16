@@ -822,5 +822,54 @@ Added `InsightsService.generateFromData()` and `MemesService.generateFromMarketD
 
 **Automated verification:** frontend `build`, `lint`, `test` (37 tests); root `build`, `lint`, `test` — pass.
 
-**Remaining limitations:** incomplete onboarding state is not persisted across refresh; dashboard and preferences editing remain out of scope.
+**Remaining limitations:** incomplete onboarding state is not persisted across refresh; preferences editing and feedback voting remain out of scope.
 
+---
+
+## Stage 22: Real dashboard UI
+
+**Date:** 2026-06-16
+
+**Summary:** Replaced the dashboard placeholder with a real authenticated UI wired to `GET /api/dashboard`. Implemented four section components (Market News, Coin Prices, AI Insight of the Day, Fun Crypto Meme) with `available` / `disabled` / `unavailable` / `isStale` / empty-array handling, page-level loading skeleton and retry states, manual full-dashboard refresh, preferences links (no editing), and Vitest coverage with mocked dashboard API.
+
+**Design reference:** approved dashboard screenshot (dark two-column card grid, turquoise accents).
+
+**Automated verification:** frontend `build`, `lint`, `test`; root `build`, `lint`, `test` — pass.
+
+**Remaining limitations:** no preferences editing, feedback voting, charts, regeneration, or section-specific refresh on the dashboard.
+
+---
+
+## Stage 22.5: Daily personalized meme variation
+
+**Date:** 2026-06-16
+
+**Summary:** Replaced single-template meme generation with a deterministic variation system: configurable `IMGFLIP_TEMPLATE_IDS` pool, four safe caption styles, crypto-seeded template/caption selection from `userId`, UTC date, investor profile, sorted coin IDs, and template pool version. Updated meme context hash and snapshot metadata; same user/day reuse unchanged; different users or UTC days get distinct variations when the pool allows.
+
+**Automated verification:** backend unit/E2E tests with mocked Imgflip; root build/lint/test — pass.
+
+**Remaining limitations:** no meme regeneration button, frontend changes, AI captions, or historical meme browsing.
+
+---
+
+## Stage 22.6: Expanded daily meme variation
+
+**Date:** 2026-06-16
+
+**Summary:** Expanded the deterministic meme system with an ~11-template Imgflip pool validated at startup, movement- and profile-aware caption families (positive/negative/neutral × investor profile), consecutive-day anti-repeat for template and caption variation using the previous day's stored meme, independent template/caption selection, and a single deterministic template fallback when Imgflip fails. Public meme response shape unchanged; same-day persistence still skips Imgflip.
+
+**Automated verification:** backend build, lint, unit tests, E2E tests, and audit — pass.
+
+**Remaining limitations:** unchanged from Stage 22.5.
+
+---
+
+## Stage 23: Frontend Preferences UI
+
+**Date:** 2026-06-16
+
+**Summary:** Replaced the `/preferences` placeholder with a real authenticated settings page for onboarding-completed users. Loads preferences, selected coins, and the supported coin catalog concurrently; reuses onboarding option constants and step components; tracks unsaved changes; saves only changed resources via `PATCH /api/preferences` and/or `PUT /api/selected-coins` with concurrent requests, canonical re-fetch, and honest partial-failure messaging. Enforces at least one selected coin as a frontend product rule.
+
+**Automated verification:** frontend build, lint, Vitest — pass.
+
+**Remaining limitations:** no feedback voting, profile/email/password editing, or unsaved-change persistence across refresh.

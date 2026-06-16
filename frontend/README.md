@@ -50,7 +50,10 @@ src/
 │   ├── layout/       # AppShell, headers, page containers, section cards
 │   └── states/       # Loading, error, empty, unavailable, disabled, stale, API status
 ├── config/           # Environment validation
-├── pages/            # Route-level placeholder screens
+├── pages/            # Route-level screens
+├── dashboard/        # Dashboard types, sections, data hook
+├── preferences/      # Preferences page hook, validation, tests
+├── onboarding/       # Onboarding flow, shared option constants, step components
 ├── theme/            # MUI theme, palette, typography, component overrides
 └── types/            # Shared frontend types (e.g. dashboard section status)
 ```
@@ -65,8 +68,8 @@ src/
 | `/login` | Public | Login form (real API flow) |
 | `/register` | Public | Registration form (real API flow) |
 | `/onboarding` | Protected | Three-step onboarding flow (real API) |
-| `/dashboard` | Protected | Dashboard placeholder (auth verified) |
-| `/preferences` | Protected | Preferences structure placeholder |
+| `/dashboard` | Protected | Personalized dashboard (`GET /api/dashboard`) |
+| `/preferences` | Protected | Dashboard preferences editor |
 | `/forbidden` | Public | Access denied page |
 | `*` | Public | Not found page |
 
@@ -118,6 +121,30 @@ JWT is not decoded client-side.
 - Errors normalized to `ApiError` — UI components do not receive raw Axios errors
 - Auth API functions are implemented in `src/api/auth.ts` (register, login, current user)
 - Onboarding API functions in `src/api/onboarding.ts` and `src/api/coins.ts`
+- Dashboard API function in `src/api/dashboard.ts` (`GET /api/dashboard` only — no standalone market/news/insight/meme calls from the dashboard page)
+
+---
+
+## Dashboard (`/dashboard`)
+
+The dashboard loads a single orchestrated response from `GET /api/dashboard` and renders four personalized sections:
+
+1. **Market News**
+2. **Coin Prices**
+3. **AI Insight of the Day**
+4. **Fun Crypto Meme**
+
+Each section supports backend statuses `available`, `unavailable`, and `disabled`. Market and News may include `isStale: true` when last-known cached data is shown after a provider failure.
+
+**Partial availability:** one section failing or being disabled does not block the rest of the dashboard.
+
+**Manual refresh:** one page-level refresh action re-fetches the full dashboard; section-specific refresh, polling, and regeneration are not implemented.
+
+**Preferences:** links to `/preferences` open the settings page for onboarding-completed users.
+
+**Not implemented on dashboard:** feedback voting, charts, sentiment labels, confidence scores, AI/meme regeneration.
+
+Visual layout follows the approved dashboard screenshot (dark two-column card grid, turquoise accents).
 
 ---
 
@@ -186,18 +213,44 @@ On success, the app calls `refreshUser()` via `GET /api/auth/me` and redirects t
 
 ---
 
-## Current stage limitations (Stage 21)
+## Preferences (`/preferences`)
 
-**Implemented:** three-step onboarding UI, coin catalog loading, atomic onboarding submission, post-completion user refresh, and onboarding tests.
+Authenticated settings page for users with `onboardingCompleted=true`. Loads canonical backend state on mount:
+
+- `GET /api/preferences`
+- `GET /api/selected-coins`
+- `GET /api/coins`
+
+The form reuses onboarding option definitions (`INVESTOR_PROFILE_OPTIONS`, `CONTENT_PREFERENCE_OPTIONS`) and step components for investor profile, dashboard content toggles, and coin selection.
+
+**Save behavior:** changes are tracked against the last loaded backend state. Save calls only the endpoints that changed:
+
+- `PATCH /api/preferences` — partial payload with changed profile/content fields only
+- `PUT /api/selected-coins` — full `{ coinIds: number[] }` replace
+
+Independent changed requests run concurrently. After save, the page re-fetches preferences and selected coins and shows success, partial failure, or error messaging. The frontend does not clear backend daily-content persistence; the next dashboard load reflects backend invalidation rules.
+
+**Product rule:** at least one coin must remain selected in the UI (backend `PUT` allows an empty array, but Market, News, Insight, and Meme depend on selected coins).
+
+**Limitation:** unsaved edits are lost on browser refresh; a `beforeunload` warning is shown when practical.
+
+**Discard Changes** restores the last loaded backend state without writing to the server.
+
+---
+
+## Current stage limitations (Stage 23)
+
+**Implemented:** real dashboard UI, preferences editor (`/preferences`) with separate save operations and partial-failure handling, and shared onboarding option definitions.
 
 **Not yet implemented:**
 
 - Google OAuth
 - Token refresh and password reset
-- Dashboard API integration (`GET /api/dashboard`)
-- Preferences editing after onboarding (`PATCH /api/preferences`)
-- Feedback, charts, sentiment, or regeneration controls
+- Feedback voting on insight or meme
+- Charts, sentiment labels, confidence scores
+- AI or meme regeneration and section-specific refresh
 - Persisting incomplete onboarding drafts across refresh
+- Persisting unsaved preferences drafts across refresh
 
 ---
 

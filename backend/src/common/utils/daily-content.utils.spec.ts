@@ -26,15 +26,52 @@ describe('daily content utils', () => {
   });
 
   it('builds a stable meme context hash regardless of coin order', () => {
-    const first = buildMemeContextHash([2, 1], 181913649);
-    const second = buildMemeContextHash([1, 2], 181913649);
+    const first = buildMemeContextHash({
+      userId: 1,
+      investorProfile: 'LONG_TERM_HOLDER',
+      selectedCoinIds: [2, 1],
+      templatePoolVersion: '87743020,112126428,181913649',
+    });
+    const second = buildMemeContextHash({
+      userId: 1,
+      investorProfile: 'LONG_TERM_HOLDER',
+      selectedCoinIds: [1, 2],
+      templatePoolVersion: '87743020,112126428,181913649',
+    });
 
     expect(first).toBe(second);
   });
 
-  it('changes the meme context hash when template ID changes', () => {
-    const first = buildMemeContextHash([1, 2], 181913649);
-    const second = buildMemeContextHash([1, 2], 999999);
+  it('changes the meme context hash when investor profile changes', () => {
+    const first = buildMemeContextHash({
+      userId: 1,
+      investorProfile: 'LONG_TERM_HOLDER',
+      selectedCoinIds: [1, 2],
+      templatePoolVersion: '87743020,112126428,181913649',
+    });
+    const second = buildMemeContextHash({
+      userId: 1,
+      investorProfile: 'BEGINNER',
+      selectedCoinIds: [1, 2],
+      templatePoolVersion: '87743020,112126428,181913649',
+    });
+
+    expect(first).not.toBe(second);
+  });
+
+  it('changes the meme context hash when the template pool version changes', () => {
+    const first = buildMemeContextHash({
+      userId: 1,
+      investorProfile: 'LONG_TERM_HOLDER',
+      selectedCoinIds: [1, 2],
+      templatePoolVersion: '87743020,112126428,181913649',
+    });
+    const second = buildMemeContextHash({
+      userId: 1,
+      investorProfile: 'LONG_TERM_HOLDER',
+      selectedCoinIds: [1, 2],
+      templatePoolVersion: '112126428,87743020',
+    });
 
     expect(first).not.toBe(second);
   });
