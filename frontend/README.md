@@ -62,10 +62,10 @@ src/
 | Path | Access | Status |
 |------|--------|--------|
 | `/` | Public | Landing page (hero + feature preview) |
-| `/login` | Public | Layout placeholder |
-| `/register` | Public | Layout placeholder |
-| `/onboarding` | Protected | Progress + selection placeholder |
-| `/dashboard` | Protected | Four-section grid skeleton |
+| `/login` | Public | Login form (real API flow) |
+| `/register` | Public | Registration form (real API flow) |
+| `/onboarding` | Protected | Onboarding-required placeholder |
+| `/dashboard` | Protected | Dashboard placeholder (auth verified) |
 | `/preferences` | Protected | Preferences structure placeholder |
 | `/forbidden` | Public | Access denied page |
 | `*` | Public | Not found page |
@@ -74,13 +74,37 @@ Protected routes redirect unauthenticated users to `/login` and preserve the int
 
 ---
 
-## Authentication foundation
+## Authentication
 
-- React Context exposes `accessToken`, `isAuthenticated`, `isInitializing`, `login(token)`, and `logout()`
-- Access token stored in `localStorage` via `auth-storage.ts` (single module — no scattered storage access)
-- Login/register API calls are **not** implemented yet
-- User identity will later be loaded from `GET /api/auth/me`
-- JWT is not decoded client-side
+### Registration (`/register`)
+
+The frontend registration form sends exactly the backend `POST /api/auth/register` payload:
+
+```json
+{ "name": "Ron", "email": "ron@example.com", "password": "StrongPass123!" }
+```
+
+The UI includes `Confirm Password`, but **`confirmPassword` is frontend-only** and is never sent to the backend.
+
+### Login (`/login`)
+
+- Calls `POST /api/auth/login` and stores only the returned `accessToken` in `localStorage` via `auth-storage.ts`.
+- Loads the authenticated user from `GET /api/auth/me` (source of truth).
+- Redirects based on `onboardingCompleted`:
+  - `false` → `/onboarding`
+  - `true` → preserved destination (when safe) or `/dashboard`
+
+### Auth context
+
+React Context provides:
+
+- `user` (from `/api/auth/me`)
+- `accessToken` (stored locally)
+- `login(credentials)` and `logout()`
+- `refreshUser()`
+- `isInitializing` and recoverable initialization error state
+
+JWT is not decoded client-side.
 
 **Production note:** HttpOnly secure cookies are generally preferred over `localStorage` for access tokens. This assignment uses `localStorage` for simplicity.
 
@@ -92,7 +116,7 @@ Protected routes redirect unauthenticated users to `/login` and preserve the int
 - Automatically attaches `Authorization: Bearer <token>` when a token exists
 - `401` responses clear the stored token; the auth layer handles redirect to login
 - Errors normalized to `ApiError` — UI components do not receive raw Axios errors
-- Feature-specific API functions are not implemented yet (except `GET /health`)
+- Auth API functions are implemented in `src/api/auth.ts` (register, login, current user)
 
 ---
 
@@ -119,6 +143,7 @@ npm install
 npm run dev      # http://localhost:5173
 npm run build
 npm run lint
+npm test
 ```
 
 Run backend and frontend together from the repository root: `npm run dev`.
@@ -127,19 +152,17 @@ Ensure `FRONTEND_URL` in `backend/.env` matches the Vite dev origin for CORS.
 
 ---
 
-## Current stage limitations (Stage 19)
+## Current stage limitations (Stage 20)
 
-**Implemented:** architecture, MUI theme, routing, auth context, API client, shared layout/components, global states, environment validation, backend health connectivity indicator.
+**Implemented:** full register + login screens and auth flow, auth context startup user loading via `/api/auth/me`, onboarding-aware route guards, logout, and frontend tests for auth flows.
 
 **Not yet implemented:**
 
-- Complete registration and login flows
 - Google OAuth
 - Token refresh and password reset
 - Onboarding API integration
 - Dashboard API integration (`GET /api/dashboard`)
 - Preferences API integration
-- User profile loading (`GET /api/auth/me`)
 - Feedback, charts, sentiment, or regeneration controls
 
 ---

@@ -6,6 +6,7 @@ import { normalizeApiError } from './api-error';
 const { apiBaseUrl } = getEnvironment();
 
 let unauthorizedHandler: (() => void) | null = null;
+let isHandlingUnauthorized = false;
 
 export function setUnauthorizedHandler(handler: (() => void) | null): void {
   unauthorizedHandler = handler;
@@ -31,9 +32,16 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
       clearStoredToken();
-      unauthorizedHandler?.();
+
+      if (!isHandlingUnauthorized) {
+        isHandlingUnauthorized = true;
+        unauthorizedHandler?.();
+        window.setTimeout(() => {
+          isHandlingUnauthorized = false;
+        }, 0);
+      }
     }
 
     return Promise.reject(normalizeApiError(error));

@@ -802,3 +802,13 @@ Added `InsightsService.generateFromData()` and `MemesService.generateFromMarketD
 
 **Remaining limitations:** placeholder screens only; no feature API calls except health check; no frontend test framework added.
 
+---
+
+## Stage 20: Frontend authentication screens and real auth flow
+
+**Date:** 2026-06-16
+
+**Summary:** Implemented real registration and login screens against the NestJS backend (`POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`). Added typed auth API functions, upgraded auth context to load the current user on startup when a token exists, and implemented onboarding-aware route guards (public-only auth routes, onboarding-only, and onboarding-required protected routes). Added logout behavior and session-expiration handling on `401`.
+
+**Testing:** Added a minimal frontend test stack (Vitest + React Testing Library + jsdom) with mocked backend calls and coverage for registration/login flows, onboarding redirects, token persistence, and logout.
+

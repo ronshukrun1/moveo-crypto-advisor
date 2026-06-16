@@ -74,6 +74,7 @@ npm install
 cd frontend
 cp .env.example .env
 npm install
+npm test
 ```
 
 | Variable | Purpose |

@@ -1,5 +1,8 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { ProtectedRoute } from '../auth/ProtectedRoute';
+import { AuthSessionRedirect, ProtectedRoute } from '../auth/ProtectedRoute';
+import { PublicAuthRoute } from '../auth/PublicAuthRoute';
+import { OnboardingRequiredRoute } from '../auth/OnboardingRequiredRoute';
+import { OnboardingOnlyRoute } from '../auth/OnboardingOnlyRoute';
 import { DashboardPage } from '../pages/DashboardPage';
 import { ForbiddenPage } from '../pages/ForbiddenPage';
 import { LandingPage } from '../pages/LandingPage';
@@ -11,20 +14,31 @@ import { RegisterPage } from '../pages/RegisterPage';
 
 export function AppRouter() {
   return (
-    <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/forbidden" element={<ForbiddenPage />} />
+    <>
+      <AuthSessionRedirect />
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/forbidden" element={<ForbiddenPage />} />
 
-      <Route element={<ProtectedRoute />}>
-        <Route path="/onboarding" element={<OnboardingPage />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/preferences" element={<PreferencesPage />} />
-      </Route>
+        <Route element={<PublicAuthRoute />}>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+        </Route>
 
-      <Route path="/home" element={<Navigate to="/" replace />} />
-      <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+        <Route element={<ProtectedRoute />}>
+          <Route element={<OnboardingOnlyRoute />}>
+            <Route path="/onboarding" element={<OnboardingPage />} />
+          </Route>
+
+          <Route element={<OnboardingRequiredRoute />}>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/preferences" element={<PreferencesPage />} />
+          </Route>
+        </Route>
+
+        <Route path="/home" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </>
   );
 }

@@ -4,12 +4,12 @@ import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
+import { useNavigate } from 'react-router-dom';
 import { AppLogo } from '../common/AppLogo';
 import { useAuth } from '../../auth/auth-context';
 
 interface AuthenticatedHeaderProps {
   subtitle?: string;
-  userDisplayName?: string;
 }
 
 function formatToday(): string {
@@ -21,11 +21,14 @@ function formatToday(): string {
   }).format(new Date());
 }
 
-export function AuthenticatedHeader({
-  subtitle = formatToday(),
-  userDisplayName = 'Account',
-}: AuthenticatedHeaderProps) {
-  const { logout } = useAuth();
+export function AuthenticatedHeader({ subtitle = formatToday() }: AuthenticatedHeaderProps) {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
 
   return (
     <AppBar
@@ -45,7 +48,7 @@ export function AuthenticatedHeader({
         }}
       >
         <Box>
-          <AppLogo to="/dashboard" />
+          <AppLogo to={user?.onboardingCompleted ? '/dashboard' : '/onboarding'} />
           {subtitle ? (
             <Typography variant="metadata" sx={{ mt: 0.5, display: { xs: 'none', sm: 'block' } }}>
               {subtitle}
@@ -55,11 +58,11 @@ export function AuthenticatedHeader({
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <Typography variant="body2" sx={{ display: { xs: 'none', sm: 'block' } }}>
-            {userDisplayName}
+            {user?.name ?? 'Account'}
           </Typography>
           <IconButton
             aria-label="Sign out"
-            onClick={logout}
+            onClick={handleLogout}
             sx={{ border: '1px solid', borderColor: 'divider' }}
           >
             <LogoutRoundedIcon fontSize="small" />

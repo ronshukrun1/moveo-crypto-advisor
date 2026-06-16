@@ -96,8 +96,8 @@ export function LandingPage() {
             variant="muted"
             sx={{ mt: 2, maxWidth: 620, fontSize: { xs: '1rem', md: '1.125rem' } }}
           >
-            Get daily AI-curated market insights, real-time prices, and personalized content
-            based on your investment style.
+            Get daily educational market insights, real-time prices, and personalized content based
+            on your preferences.
           </Typography>
 
           <Box

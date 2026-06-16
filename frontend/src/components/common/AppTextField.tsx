@@ -9,8 +9,27 @@ type AppTextFieldProps = TextFieldProps & {
   startIcon?: ReactNode;
 };
 
-export function AppTextField({ label, startIcon, id, ...props }: AppTextFieldProps) {
+export function AppTextField({
+  label,
+  startIcon,
+  id,
+  slotProps,
+  ...props
+}: AppTextFieldProps) {
   const fieldId = id ?? (typeof label === 'string' ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
+
+  const inputSlotProps = {
+    ...(slotProps?.input ?? {}),
+    ...(startIcon
+      ? {
+          startAdornment: (
+            <InputAdornment position="start" sx={{ color: 'text.secondary' }}>
+              {startIcon}
+            </InputAdornment>
+          ),
+        }
+      : {}),
+  };
 
   return (
     <Box>
@@ -21,19 +40,10 @@ export function AppTextField({ label, startIcon, id, ...props }: AppTextFieldPro
       ) : null}
       <TextField
         id={fieldId}
-        slotProps={
-          startIcon
-            ? {
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start" sx={{ color: 'text.secondary' }}>
-                      {startIcon}
-                    </InputAdornment>
-                  ),
-                },
-              }
-            : undefined
-        }
+        slotProps={{
+          ...slotProps,
+          input: Object.keys(inputSlotProps).length > 0 ? inputSlotProps : slotProps?.input,
+        }}
         {...props}
       />
     </Box>
