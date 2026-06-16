@@ -64,7 +64,7 @@ src/
 | `/` | Public | Landing page (hero + feature preview) |
 | `/login` | Public | Login form (real API flow) |
 | `/register` | Public | Registration form (real API flow) |
-| `/onboarding` | Protected | Onboarding-required placeholder |
+| `/onboarding` | Protected | Three-step onboarding flow (real API) |
 | `/dashboard` | Protected | Dashboard placeholder (auth verified) |
 | `/preferences` | Protected | Preferences structure placeholder |
 | `/forbidden` | Public | Access denied page |
@@ -117,6 +117,7 @@ JWT is not decoded client-side.
 - `401` responses clear the stored token; the auth layer handles redirect to login
 - Errors normalized to `ApiError` — UI components do not receive raw Axios errors
 - Auth API functions are implemented in `src/api/auth.ts` (register, login, current user)
+- Onboarding API functions in `src/api/onboarding.ts` and `src/api/coins.ts`
 
 ---
 
@@ -152,18 +153,51 @@ Ensure `FRONTEND_URL` in `backend/.env` matches the Vite dev origin for CORS.
 
 ---
 
-## Current stage limitations (Stage 20)
+## Onboarding (`/onboarding`)
 
-**Implemented:** full register + login screens and auth flow, auth context startup user loading via `/api/auth/me`, onboarding-aware route guards, logout, and frontend tests for auth flows.
+Three-step authenticated flow (in-memory state only; restarting the page before submission resets progress):
+
+1. **Investor profile** — select exactly one backend enum value:
+   - `BEGINNER`
+   - `LONG_TERM_HOLDER`
+   - `ACTIVE_TRADER`
+   - `CRYPTO_ENTHUSIAST`
+2. **Content preferences** — toggle booleans (default all `true`):
+   - `showMarketPrices`
+   - `showNews`
+   - `showAiInsight` (includes educational disclaimer)
+   - `showMeme`
+3. **Select coins** — load `GET /api/coins`, select at least one coin by backend `id`
+
+Submission calls `POST /api/onboarding` with:
+
+```json
+{
+  "investorProfile": "BEGINNER",
+  "showMarketPrices": true,
+  "showNews": true,
+  "showAiInsight": true,
+  "showMeme": true,
+  "coinIds": [1, 2]
+}
+```
+
+On success, the app calls `refreshUser()` via `GET /api/auth/me` and redirects to `/dashboard` when `onboardingCompleted` is `true`.
+
+---
+
+## Current stage limitations (Stage 21)
+
+**Implemented:** three-step onboarding UI, coin catalog loading, atomic onboarding submission, post-completion user refresh, and onboarding tests.
 
 **Not yet implemented:**
 
 - Google OAuth
 - Token refresh and password reset
-- Onboarding API integration
 - Dashboard API integration (`GET /api/dashboard`)
-- Preferences API integration
+- Preferences editing after onboarding (`PATCH /api/preferences`)
 - Feedback, charts, sentiment, or regeneration controls
+- Persisting incomplete onboarding drafts across refresh
 
 ---
 

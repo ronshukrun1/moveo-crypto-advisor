@@ -812,3 +812,15 @@ Added `InsightsService.generateFromData()` and `MemesService.generateFromMarketD
 
 **Testing:** Added a minimal frontend test stack (Vitest + React Testing Library + jsdom) with mocked backend calls and coverage for registration/login flows, onboarding redirects, token persistence, and logout.
 
+---
+
+## Stage 21: Frontend onboarding flow
+
+**Date:** 2026-06-16
+
+**Summary:** Replaced the onboarding placeholder with a three-step authenticated flow (investor profile, content preferences, coin selection). Coins load from `GET /api/coins`; submission uses `POST /api/onboarding` with backend enum/boolean/`coinIds` fields only. On success, `refreshUser()` reloads `/api/auth/me` and redirects to `/dashboard`.
+
+**Automated verification:** frontend `build`, `lint`, `test` (37 tests); root `build`, `lint`, `test` — pass.
+
+**Remaining limitations:** incomplete onboarding state is not persisted across refresh; dashboard and preferences editing remain out of scope.
+

@@ -10,6 +10,10 @@ export const componentOverrides: Components<Theme> = {
       '#root': {
         minHeight: '100vh',
       },
+      '::selection': {
+        backgroundColor: 'rgba(67, 214, 200, 0.35)',
+        color: '#F0F6FC',
+      },
     },
   },
   MuiButton: {
@@ -69,6 +73,13 @@ export const componentOverrides: Components<Theme> = {
         '&.Mui-focused fieldset': {
           borderColor: '#43D6C8',
         },
+        '& input:-webkit-autofill, & input:-webkit-autofill:hover, & input:-webkit-autofill:focus, & input:-webkit-autofill:active':
+          {
+            WebkitBoxShadow: '0 0 0 1000px #0D1117 inset',
+            WebkitTextFillColor: '#F0F6FC',
+            caretColor: '#F0F6FC',
+            transition: 'background-color 5000s ease-in-out 0s',
+          },
       },
     },
   },

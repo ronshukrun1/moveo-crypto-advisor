@@ -12,10 +12,12 @@ import { OnboardingRequiredRoute } from '../auth/OnboardingRequiredRoute';
 import { OnboardingOnlyRoute } from '../auth/OnboardingOnlyRoute';
 import { renderWithProviders } from '../test/test-utils';
 import * as authApi from '../api/auth';
+import * as coinsApi from '../api/coins';
 import { setStoredToken, clearStoredToken } from '../auth/auth-storage';
 import { ApiError } from '../api/api-error';
 
 vi.mock('../api/auth');
+vi.mock('../api/coins');
 
 const incompleteUser = {
   id: 1,
@@ -56,6 +58,9 @@ describe('authentication flows', () => {
     vi.clearAllMocks();
     clearStoredToken();
     localStorage.clear();
+    vi.mocked(coinsApi.getSupportedCoins).mockResolvedValue({
+      items: [{ id: 1, coingeckoId: 'bitcoin', symbol: 'btc', name: 'Bitcoin' }],
+    });
   });
 
   it('register form includes name, email, password, and confirm password fields', () => {
@@ -147,7 +152,7 @@ describe('authentication flows', () => {
       expect(authApi.getCurrentUser).toHaveBeenCalled();
     });
 
-    expect(await screen.findByText(/Onboarding is required/i)).toBeInTheDocument();
+    expect(await screen.findByText('Personalize your crypto dashboard')).toBeInTheDocument();
     expect(localStorage.getItem('accessToken')).toBe('token-123');
   });
 

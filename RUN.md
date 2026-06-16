@@ -158,6 +158,8 @@ npm run dev
 
 Default Vite URL: http://localhost:5173 (must match `FRONTEND_URL` in `backend/.env` for CORS).
 
+After login, users with `onboardingCompleted=false` are redirected to `/onboarding` to complete the three-step setup (`GET /api/coins`, then `POST /api/onboarding`). Incomplete step state is kept in memory only and resets on page refresh before submission.
+
 Copy `frontend/.env.example` to `frontend/.env` before starting. If `VITE_API_BASE_URL` is missing or wrong, the app fails at startup or the API status indicator shows **unavailable**.
 
 ### Start both from root
