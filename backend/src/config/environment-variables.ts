@@ -97,4 +97,25 @@ export class EnvironmentVariables {
   @IsInt()
   @Min(1)
   OPENROUTER_TIMEOUT_MS: number;
+
+  @IsUrl({ require_tld: false })
+  IMGFLIP_BASE_URL: string;
+
+  @IsString()
+  @IsNotEmpty()
+  IMGFLIP_USERNAME: string;
+
+  @IsString()
+  @IsNotEmpty()
+  IMGFLIP_PASSWORD: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  IMGFLIP_TEMPLATE_ID: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  IMGFLIP_TIMEOUT_MS: number;
 }

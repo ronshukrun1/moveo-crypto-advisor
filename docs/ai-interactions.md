@@ -557,3 +557,57 @@ Added `InsightsModule` with `OpenRouterClient`, `InsightsService`, and `GET /api
 - E2E requires Docker PostgreSQL with migrations applied
 - Local `DB_PORT` may need to match `POSTGRES_PORT` when host `5432` is occupied
 
+---
+
+## Stage 12: Imgflip Crypto Meme Integration
+
+**Date:** 2026-06-16
+
+**Prompt summary:**
+
+Integrate Imgflip to generate a light, personalized cryptocurrency meme for authenticated users based on selected coins and current market data, without persistence or cache.
+
+**Response summary:**
+
+Added `MemesModule` with `ImgflipClient`, `MemesService`, and `GET /api/memes/daily` (JWT). Loads selected coins and market data, builds deterministic captions from the coin with the largest absolute 24h move, calls Imgflip `caption_image`, validates `success` in the response body, and returns mapped URLs and captions with `generatedAt`. Each call generates a new meme until persistence is added later.
+
+**Main decisions:**
+
+- Imgflip env vars validated at startup; username/password auth via form-urlencoded POST
+- No Imgflip call when user has no selected coins (`400`) or market data is empty (`502`)
+- Deterministic captions only — no OpenRouter or AI text generation
+- Largest absolute 24h percentage change selects the featured coin; neutral watchlist fallback when percentages are unavailable
+- HTTP `200` with `success: false` treated as failure; raw `error_message` never returned
+- Error policy: `502` auth/template/malformed, `503` rate limit, `504` timeout
+- E2E overrides `ImgflipClient` and `CoinGeckoClient` — no live APIs in tests
+
+**Files created or modified:**
+
+- Created: `backend/src/memes/*`, `backend/test/memes.e2e-spec.ts`
+- Modified: `backend/src/app.module.ts`, `backend/src/config/*`, `backend/.env.example`, `backend/test/setup-e2e-env.ts`, `docs/ai-interactions.md`
+
+**Dependencies added:**
+
+- None (`@nestjs/axios` and `axios` reused)
+
+**Migration required:**
+
+- No
+
+**Commands and tests:**
+
+- `docker compose ps` — Pass (healthy)
+- `migration:show` / `run` — Pass (no pending migrations)
+- `backend`: build, lint, test (119), test:e2e (81), audit — Pass
+- `root`: build, lint, test — Pass
+
+**Manual smoke test:**
+
+- **200** in ~1.3s — `imageUrl` and `pageUrl` both opened successfully; both captions present in response and visible on the Imgflip page; response structure passed validation with no credentials or raw Imgflip fields exposed
+
+**Unresolved issues:**
+
+- Live meme generation depends on valid Imgflip credentials
+- Endpoint generates a new meme on every call until persistence/cache is implemented
+- E2E requires Docker PostgreSQL with migrations applied
+

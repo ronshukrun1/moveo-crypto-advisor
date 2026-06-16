@@ -24,6 +24,11 @@ const defaultTestEnvironment = {
   OPENROUTER_API_KEY: 'test-openrouter-api-key',
   OPENROUTER_MODEL: 'openai/gpt-oss-20b:free',
   OPENROUTER_TIMEOUT_MS: '10000',
+  IMGFLIP_BASE_URL: 'https://api.imgflip.com',
+  IMGFLIP_USERNAME: 'test-imgflip-username',
+  IMGFLIP_PASSWORD: 'test-imgflip-password',
+  IMGFLIP_TEMPLATE_ID: '181913649',
+  IMGFLIP_TIMEOUT_MS: '5000',
 };
 
 for (const [key, value] of Object.entries(defaultTestEnvironment)) {

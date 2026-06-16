@@ -34,5 +34,12 @@ export function getEnvironmentVariables(
     OPENROUTER_TIMEOUT_MS: configService.getOrThrow<number>(
       'OPENROUTER_TIMEOUT_MS',
     ),
+    IMGFLIP_BASE_URL: configService.getOrThrow<string>('IMGFLIP_BASE_URL'),
+    IMGFLIP_USERNAME: configService.getOrThrow<string>('IMGFLIP_USERNAME'),
+    IMGFLIP_PASSWORD: configService.getOrThrow<string>('IMGFLIP_PASSWORD'),
+    IMGFLIP_TEMPLATE_ID: configService.getOrThrow<number>(
+      'IMGFLIP_TEMPLATE_ID',
+    ),
+    IMGFLIP_TIMEOUT_MS: configService.getOrThrow<number>('IMGFLIP_TIMEOUT_MS'),
   };
 }
