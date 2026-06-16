@@ -93,6 +93,41 @@ const mockArticle = {
   source_url: 'https://example.com',
 };
 
+const mockRelevantEthArticle = {
+  ...mockArticle,
+  article_id: 'article-eth',
+  link: 'https://example.com/article-eth',
+  title: 'Ethereum staking rewards rise',
+  description: 'Validators earned more this week.',
+  coin: ['ETH'],
+  pubDate: '2026-06-15 10:00:00',
+};
+
+const mockIrrelevantBtcArticle = {
+  ...mockArticle,
+  article_id: 'article-gold',
+  link: 'https://example.com/article-gold',
+  title: 'Gold prices surge on global tension',
+  description: 'Precious metals rallied while equities fell.',
+  coin: ['BTC'],
+};
+
+const mockUnselectedCoinArticle = {
+  ...mockArticle,
+  article_id: 'article-sol',
+  link: 'https://example.com/article-sol',
+  title: 'Solana ecosystem accelerates',
+  description: 'SOL network activity rose.',
+  coin: ['SOL'],
+};
+
+const mockMixedNewsArticles = [
+  mockArticle,
+  mockRelevantEthArticle,
+  mockIrrelevantBtcArticle,
+  mockUnselectedCoinArticle,
+];
+
 const validModelJson =
   '{"title":"Bitcoin and Ethereum Update","insight":"Bitcoin rose 2.2% during the last 24 hours. Ethereum also moved higher while recent headlines reflected ongoing network and market activity."}';
 
@@ -255,6 +290,31 @@ describe('Dashboard (e2e)', () => {
     expect(body.insight.status).toBe('available');
     expect(body.meme.status).toBe('available');
     expect(body.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('excludes irrelevant news articles from the dashboard response', async () => {
+    const token = await registerAndLogin();
+    await onboardUser(token);
+    mockExternalDependencies();
+    newsDataClient.fetchNews.mockResolvedValue({
+      status: 'success',
+      totalResults: 4,
+      results: mockMixedNewsArticles,
+      nextPage: 'next-token',
+    });
+
+    const response = await request(app.getHttpServer())
+      .get('/api/dashboard')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const body = response.body as DashboardResponse;
+    expect(body.news.status).toBe('available');
+    expect(body.news.items).toHaveLength(2);
+    expect(
+      (body.news.items as Array<{ id: string }>).map((item) => item.id),
+    ).toEqual(['article-eth', 'article-1']);
+    expect(body.news.nextPage).toBe('next-token');
   });
 
   it('calls CoinGecko once when market, insight, and meme are enabled', async () => {

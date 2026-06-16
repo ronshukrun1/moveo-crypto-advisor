@@ -172,6 +172,9 @@ Existing migrations:
 |----------|------|------|
 | CoinGecko | Market prices, 24h change, highs/lows | API key header |
 | NewsData | Crypto news for selected symbols | API key query param |
+
+NewsData results are filtered server-side after mapping and deduplication. An article is kept only when it matches at least one selected coin by symbol/name in `title`, `description`, and `relatedCoins` metadata. Filtering is deterministic (no AI classification). A page may return fewer items than the requested `limit` when loosely tagged articles are removed; `nextPage` from the upstream response is preserved without automatic extra fetches.
+
 | OpenRouter | Educational insight JSON | Bearer API key |
 | Imgflip | Meme image from template + captions | **Username and password** (form POST) |
 
@@ -230,6 +233,7 @@ See [../RUN.md](../RUN.md) for full quality commands.
 - No cross-request cache or Redis.
 - Insight and meme regenerate on every `/daily` and dashboard request — no daily persistence tables yet.
 - Market and news are always fetched live when required.
+- News pages may return fewer than the requested `limit` after relevance filtering; no automatic extra NewsData fetches are made to fill a page.
 - Dashboard latency is dominated by OpenRouter (and Imgflip when enabled).
 - Free-tier external API rate limits may affect manual testing.
 - Frontend product UI and API integration are not implemented in this repository.

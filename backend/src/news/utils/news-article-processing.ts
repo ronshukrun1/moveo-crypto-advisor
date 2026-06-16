@@ -1,6 +1,10 @@
 import { NewsDataArticle } from '../interfaces/news-data.interfaces';
 import { NewsItemDto } from '../dto/news-response.dto';
 import { toNewsItemDto } from '../mappers/news-response.mapper';
+import {
+  filterNewsArticlesByRelevance,
+  SelectedCoinForRelevance,
+} from './news-relevance-filter';
 
 function normalizeUrl(url: string): string {
   return url.trim().toLowerCase();
@@ -70,8 +74,40 @@ export function sortNewsArticlesByPublishedAt(
   });
 }
 
+export function mapNewsArticlesToDto(
+  articles: NewsDataArticle[],
+): NewsItemDto[] {
+  return articles.map(toNewsItemDto);
+}
+
+export interface ProcessedNewsArticlesResult {
+  items: NewsItemDto[];
+  receivedCount: number;
+  filteredCount: number;
+  returnedCount: number;
+}
+
+export function processNewsArticles(
+  articles: NewsDataArticle[],
+  selectedCoins: SelectedCoinForRelevance[],
+  limit: number,
+): ProcessedNewsArticlesResult {
+  const receivedCount = articles.length;
+  const deduplicated = deduplicateNewsArticles(articles);
+  const relevant = filterNewsArticlesByRelevance(deduplicated, selectedCoins);
+  const sorted = sortNewsArticlesByPublishedAt(relevant);
+  const limited = sorted.slice(0, limit);
+
+  return {
+    items: mapNewsArticlesToDto(limited),
+    receivedCount,
+    filteredCount: relevant.length,
+    returnedCount: limited.length,
+  };
+}
+
 export function mapNewsArticles(articles: NewsDataArticle[]): NewsItemDto[] {
-  return sortNewsArticlesByPublishedAt(deduplicateNewsArticles(articles)).map(
-    toNewsItemDto,
+  return mapNewsArticlesToDto(
+    sortNewsArticlesByPublishedAt(deduplicateNewsArticles(articles)),
   );
 }

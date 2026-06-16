@@ -728,3 +728,17 @@ Added `InsightsService.generateFromData()` and `MemesService.generateFromMarketD
 
 **Summary:** Reorganized documentation into `README.md` (overview), `RUN.md` (operations), `backend/README.md` (backend design/API), `frontend/README.md` (scaffold status), and `docs/ai-interactions.md` (development log). Moved setup and test commands from the backend README to `RUN.md`.
 
+---
+
+## Stage 15: News relevance filtering
+
+**Date:** 2026-06-16
+
+**Summary:** Added deterministic server-side news relevance filtering in `NewsService` after NewsData mapping and deduplication. Articles must match a selected coin via `relatedCoins` plus title/description text, or via a strong title match. Irrelevant loosely tagged articles are removed; `nextPage` is preserved and pages may return fewer than `limit` items.
+
+**Automated verification:** backend build, lint, unit tests, E2E tests, audit, and root build/lint/test — pass.
+
+**Live smoke test:** `GET /api/news?limit=5` returned **200** in ~0.66s with **3** relevant BTC/ETH articles (fewer than requested limit); loosely tagged irrelevant articles excluded; response shape unchanged (`items`, `nextPage`); `nextPage` present.
+
+**Remaining limitations:** no automatic extra NewsData page fetches to refill filtered pages; no persistence or cache.
+

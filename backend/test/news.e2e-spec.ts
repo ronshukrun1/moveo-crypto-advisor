@@ -56,6 +56,41 @@ const mockArticle = {
   source_url: 'https://example.com',
 };
 
+const mockRelevantEthArticle = {
+  ...mockArticle,
+  article_id: 'article-eth',
+  link: 'https://example.com/article-eth',
+  title: 'Ethereum staking rewards rise',
+  description: 'Validators earned more this week.',
+  coin: ['ETH'],
+  pubDate: '2026-06-15 10:00:00',
+};
+
+const mockIrrelevantBtcArticle = {
+  ...mockArticle,
+  article_id: 'article-gold',
+  link: 'https://example.com/article-gold',
+  title: 'Gold prices surge on global tension',
+  description: 'Precious metals rallied while equities fell.',
+  coin: ['BTC'],
+};
+
+const mockUnselectedCoinArticle = {
+  ...mockArticle,
+  article_id: 'article-sol',
+  link: 'https://example.com/article-sol',
+  title: 'Solana ecosystem accelerates',
+  description: 'SOL network activity rose.',
+  coin: ['SOL'],
+};
+
+const mockMixedNewsArticles = [
+  mockArticle,
+  mockRelevantEthArticle,
+  mockIrrelevantBtcArticle,
+  mockUnselectedCoinArticle,
+];
+
 describe('News (e2e)', () => {
   let app: INestApplication<App>;
   let dataSource: DataSource;
@@ -173,6 +208,36 @@ describe('News (e2e)', () => {
     });
     expect(body.items).toHaveLength(1);
     expect(body.items[0].imageUrl).toBe(mockArticle.image_url);
+    expect(body.nextPage).toBe('next-token');
+  });
+
+  it('excludes irrelevant and unselected-coin articles while preserving nextPage', async () => {
+    const token = await registerAndLogin();
+
+    await request(app.getHttpServer())
+      .post('/api/onboarding')
+      .set('Authorization', `Bearer ${token}`)
+      .send(onboardingPayload)
+      .expect(200);
+
+    newsDataClient.fetchNews.mockResolvedValue({
+      status: 'success',
+      totalResults: 4,
+      results: mockMixedNewsArticles,
+      nextPage: 'next-token',
+    });
+
+    const response = await request(app.getHttpServer())
+      .get('/api/news?limit=5')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const body = response.body as NewsListResponse;
+    expect(body.items).toHaveLength(2);
+    expect(body.items.map((item) => item.id)).toEqual([
+      'article-eth',
+      'article-1',
+    ]);
     expect(body.nextPage).toBe('next-token');
   });
 

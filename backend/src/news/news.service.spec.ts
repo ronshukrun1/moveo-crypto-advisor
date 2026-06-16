@@ -10,8 +10,10 @@ import { SelectedCoinsService } from '../selected-coins/selected-coins.service';
 import {
   deduplicateNewsArticles,
   mapNewsArticles,
+  processNewsArticles,
   sortNewsArticlesByPublishedAt,
 } from './utils/news-article-processing';
+import { toSelectedCoinsForRelevance } from './utils/news-relevance-filter';
 
 describe('NewsService', () => {
   let newsService: NewsService;
@@ -141,6 +143,41 @@ describe('NewsService', () => {
     expect(result.items[0]).not.toHaveProperty('sentiment');
   });
 
+  it('filters out loosely tagged irrelevant articles', async () => {
+    selectedCoinsService.getSelectedCoins.mockResolvedValue({
+      items: [
+        { id: 1, coingeckoId: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
+        { id: 2, coingeckoId: 'ethereum', symbol: 'ETH', name: 'Ethereum' },
+      ],
+    });
+    newsDataClient.fetchNews.mockResolvedValue({
+      status: 'success',
+      totalResults: 3,
+      results: [
+        articleOne,
+        articleTwo,
+        {
+          ...articleTwo,
+          article_id: 'article-3',
+          link: 'https://example.com/article-3',
+          title: 'Gold prices surge',
+          description: 'Precious metals rallied.',
+          coin: ['BTC'],
+        },
+      ],
+      nextPage: 'next-token',
+    });
+
+    const result = await newsService.getNews(userId, { limit: 5 });
+
+    expect(result.items).toHaveLength(2);
+    expect(result.items.map((item) => item.id)).toEqual([
+      'article-2',
+      'article-1',
+    ]);
+    expect(result.nextPage).toBe('next-token');
+  });
+
   it('propagates safe upstream errors from the client', async () => {
     selectedCoinsService.getSelectedCoins.mockResolvedValue({
       items: [
@@ -229,6 +266,8 @@ describe('news article processing', () => {
     const mapped = mapNewsArticles([
       {
         ...newerArticle,
+        title: 'Bitcoin market recap',
+        coin: ['BTC'],
         content: 'ONLY AVAILABLE IN PAID PLANS',
         sentiment: 'positive',
         ai_tag: 'placeholder',
@@ -242,5 +281,95 @@ describe('news article processing', () => {
     expect(mapped[0]).not.toHaveProperty('content');
     expect(mapped[0]).not.toHaveProperty('sentiment');
     expect(mapped[0]).not.toHaveProperty('ai_tag');
+  });
+
+  it('deduplicates before relevance filtering', () => {
+    const selected = toSelectedCoinsForRelevance([
+      { coingeckoId: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
+    ]);
+    const duplicate = {
+      ...olderArticle,
+      title: 'Bitcoin update',
+      coin: ['BTC'],
+    };
+    const unique = {
+      ...newerArticle,
+      title: 'Bitcoin rebounds',
+      coin: ['BTC'],
+    };
+
+    const processed = processNewsArticles(
+      [duplicate, { ...duplicate, title: 'Duplicate ID' }, unique],
+      selected,
+      5,
+    );
+
+    expect(processed.items).toHaveLength(2);
+    expect(processed.items.map((item) => item.id)).toEqual(['newer', 'older']);
+  });
+
+  it('sorts after relevance filtering', () => {
+    const selected = toSelectedCoinsForRelevance([
+      { coingeckoId: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
+    ]);
+    const processed = processNewsArticles(
+      [
+        { ...olderArticle, title: 'Bitcoin update', coin: ['BTC'] },
+        { ...newerArticle, title: 'Bitcoin rebounds', coin: ['BTC'] },
+      ],
+      selected,
+      5,
+    );
+
+    expect(processed.items.map((item) => item.id)).toEqual(['newer', 'older']);
+  });
+
+  it('may return fewer items than the requested limit after filtering', () => {
+    const selected = toSelectedCoinsForRelevance([
+      { coingeckoId: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
+    ]);
+    const processed = processNewsArticles(
+      [
+        { ...newerArticle, title: 'Bitcoin rebounds', coin: ['BTC'] },
+        {
+          ...olderArticle,
+          article_id: 'irrelevant',
+          link: 'https://example.com/irrelevant',
+          title: 'Gold prices surge',
+          coin: ['BTC'],
+        },
+      ],
+      selected,
+      5,
+    );
+
+    expect(processed.returnedCount).toBe(1);
+    expect(processed.items).toHaveLength(1);
+    expect(processed.items[0].id).toBe('newer');
+  });
+
+  it('keeps the public response shape unchanged after filtering', () => {
+    const selected = toSelectedCoinsForRelevance([
+      { coingeckoId: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
+    ]);
+    const processed = processNewsArticles(
+      [{ ...newerArticle, title: 'Bitcoin rebounds', coin: ['BTC'] }],
+      selected,
+      5,
+    );
+
+    expect(processed.items[0]).toEqual({
+      id: 'newer',
+      title: 'Bitcoin rebounds',
+      description: null,
+      url: 'https://example.com/newer',
+      imageUrl: null,
+      sourceName: null,
+      sourceUrl: null,
+      creator: null,
+      relatedCoins: ['BTC'],
+      publishedAt: '2026-06-15T10:00:00.000Z',
+    });
+    expect(processed.items[0]).not.toHaveProperty('relevanceScore');
   });
 });
